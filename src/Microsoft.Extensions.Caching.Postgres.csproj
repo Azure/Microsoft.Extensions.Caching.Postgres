@@ -69,12 +69,10 @@
 		<PackageReference Include="Microsoft.Bcl.TimeProvider" Version="9.0.3" PrivateAssets="All" />
 	</ItemGroup>
 
-	<!--
-  <PropertyGroup>
-    <SignAssembly>true</SignAssembly>
-    <DelaySign>true</DelaySign>
-    <AssemblyOriginatorKeyFile>..\35MSSharedLib1024.snk</AssemblyOriginatorKeyFile>
-  </PropertyGroup>
--->
+	<PropertyGroup>
+		<SignAssembly>true</SignAssembly>
+		<DelaySign>true</DelaySign>
+		<AssemblyOriginatorKeyFile>..\35MSSharedLib1024.snk</AssemblyOriginatorKeyFile>
+	</PropertyGroup>
 
 </Project>
