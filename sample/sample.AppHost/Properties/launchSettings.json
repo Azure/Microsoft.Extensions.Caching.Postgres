@@ -10,7 +10,9 @@
         "ASPNETCORE_ENVIRONMENT": "Development",
         "DOTNET_ENVIRONMENT": "Development",
         "DOTNET_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21195",
-        "DOTNET_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22069"
+        "DOTNET_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22069",
+        "ConnectionStrings__PostgresCache": "Host=jnmpgf001.postgres.database.azure.com;Username=serverAdmin;Password=Test.123!;Database=postgres;Pooling=true;MinPoolSize=0;MaxPoolSize=100;Timeout=15;"
+
       }
     },
     "http": {
@@ -22,7 +24,8 @@
         "ASPNETCORE_ENVIRONMENT": "Development",
         "DOTNET_ENVIRONMENT": "Development",
         "DOTNET_DASHBOARD_OTLP_ENDPOINT_URL": "http://localhost:19081",
-        "DOTNET_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:20067"
+        "DOTNET_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:20067",
+        "ConnectionStrings__PostgresCache": "Host=jnmpgf001.postgres.database.azure.com;Username=serverAdmin;Password=Test.123!;Database=postgres;Pooling=true;MinPoolSize=0;MaxPoolSize=100;Timeout=15;"
       }
     }
   }
