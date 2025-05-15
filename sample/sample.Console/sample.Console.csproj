@@ -10,10 +10,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="appsettings.json" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Content Include="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -25,7 +21,6 @@
     <PackageReference Include="Microsoft.Extensions.Caching.Postgres" Version="1.0.0-preview" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.5" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.5" />
-    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.2" />
 	<!-- TODO: WHY DO WE NEED THIS EXPLICITLY? -->
 	<PackageReference Include="Microsoft.Bcl.TimeProvider" Version="9.0.5" />
 	<PackageReference Include="Npgsql" Version="9.0.3" />
