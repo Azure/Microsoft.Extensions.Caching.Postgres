@@ -1,0 +1,29 @@
+trigger: none
+pr:
+  branches:
+    include:
+    - master
+    - releases/*
+
+pool:
+  name: 'OneES'
+
+steps:
+- task: UseDotNet@2
+  displayName: Use .NET 6.0
+  inputs:
+    packageType: 'sdk'
+    version: '6.x'
+- task: DotNetCoreCLI@2
+  displayName: Build
+  inputs:
+    command: build
+    projects: '**/*.csproj'
+    arguments: '--configuration Release'
+- script: dotnet test ./tests/Microsoft.Extensions.Caching.Postgres.Tests.csproj --logger trx
+  displayName: 'Running tests'
+- task: PublishTestResults@2
+  condition: succeededOrFailed()
+  inputs:
+    testRunner: VSTest
+    testResultsFiles: '**/*.trx'
