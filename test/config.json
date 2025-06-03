@@ -1,6 +1,0 @@
-{
-  "ConnectionString": "Host=x.postgres.database.azure.com;Username=y;Password=z;Database=postgres;Pooling=true;MinPoolSize=0;MaxPoolSize=100;Timeout=15;",
-  "SchemaName": "public",
-  "TableName": "CacheTest",
-  "CreateIfNotExists": "true"
-}
