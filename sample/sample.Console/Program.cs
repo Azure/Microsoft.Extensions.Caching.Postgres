@@ -20,10 +20,10 @@ var host = Host.CreateDefaultBuilder(args)
         {
             // Configure the Postgres cache options here
             options.ConnectionString = context.Configuration.GetConnectionString("PostgresCache");
-            options.SchemaName = "public";
-            options.TableName = "Cache";
-            options.CreateIfNotExists = true;
-            //options.UseWAL = true;
+            options.SchemaName = context.Configuration.GetValue<string>("PostgresCache:SchemaName", "public");
+            options.TableName = context.Configuration.GetValue<string>("PostgresCache:TableName", "__cache");
+            options.CreateIfNotExists = context.Configuration.GetValue<bool>("PostgresCache:CreateIfNotExists", true);
+            options.UseWAL = context.Configuration.GetValue<bool>("PostgresCache:UseWAL", false);
         });
         // Register your services here
         services.AddScoped<IConsoleService, ConsoleService>();
