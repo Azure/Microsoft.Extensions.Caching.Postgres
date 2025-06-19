@@ -1,0 +1,7 @@
+{
+  "profiles": {
+    "sample.Console": {
+      "commandName": "Project"
+    }
+  }
+}

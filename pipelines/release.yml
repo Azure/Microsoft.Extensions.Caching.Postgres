@@ -1,0 +1,64 @@
+trigger: none
+pr: none
+variables:
+  BuildConfiguration: Release
+  Packaging.EnableSBOMSigning: true
+
+stages:
+- stage:
+  displayName: Publish 
+  jobs:
+    - job:
+      pool:
+        name: 'OneES'
+    
+      steps:
+      - task: UseDotNet@2
+        displayName: Use .NET 6.0
+        inputs:
+          packageType: 'sdk'
+          version: '6.x'
+      - task: DotNetCoreCLI@2
+        displayName: Build Microsoft.Extensions.Caching.Postgres
+        inputs: 
+          command: build  
+          configuration: $(BuildConfiguration)
+          projects: src/CosmosDistributedCache.csproj
+          arguments: --configuration $(BuildConfiguration) -p:Optimize=true 
+          versioningScheme: OFF
+
+      - task: DotNetCoreCLI@2
+        displayName: 'Create NuGet Package'
+        inputs:
+          command: custom
+          projects: 'src/CosmosDistributedCache.csproj'
+          custom: pack
+          arguments: '-v detailed -c $(BuildConfiguration) --no-build --no-restore -o "$(Build.ArtifactStagingDirectory)\bin\AnyCPU\$(BuildConfiguration)\Microsoft.Extensions.Caching.Postgres"'
+
+      - task: DotNetCoreCLI@2
+        displayName: 'Create NuGet Symbols Package'
+        inputs: 
+          command: custom
+          projects: 'src/CosmosDistributedCache.csproj'
+          custom: pack
+          arguments: '-v detailed -c $(BuildConfiguration) --no-build --include-symbols /p:SymbolPackageFormat=snupkg --no-restore -o "$(Build.ArtifactStagingDirectory)\bin\AnyCPU\$(BuildConfiguration)\Microsoft.Extensions.Caching.Postgres"'
+
+      - task: AzureArtifacts.manifest-generator-task.manifest-generator-task.ManifestGeneratorTask@0
+        inputs:
+          BuildDropPath: '$(Build.ArtifactStagingDirectory)/bin/AnyCPU/$(BuildConfiguration)/Microsoft.Extensions.Caching.Postgres'
+
+      - task: AzureFileCopy@6
+        displayName: ' Copy Artifacts to Azure SDK Release blob storage'
+        condition: and(succeeded(),ne(variables['BlobVersion'], ''))
+        inputs:
+          SourcePath: '$(Build.ArtifactStagingDirectory)/bin/AnyCPU/$(BuildConfiguration)/Microsoft.Extensions.Caching.Postgres'
+          azureSubscription: azuresdkpartnerdrops
+          Destination: AzureBlob
+          storage: azuresdkpartnerdrops
+          ContainerName: 'drops'
+          BlobPrefix: 'cosmosdb/csharp/Microsoft.Extensions.Caching.Postgres/$(BlobVersion)'
+
+      - task: PublishBuildArtifacts@1
+        displayName: 'Publish Artifacts: Microsoft.Extensions.Caching.Postgres'
+        inputs:
+          artifactName: Microsoft.Extensions.Caching.Postgres

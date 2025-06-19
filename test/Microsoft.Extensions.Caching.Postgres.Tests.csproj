@@ -1,12 +1,19 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
+		<IsTestProject>true</IsTestProject>
 		<TargetFrameworks>net8.0;net9.0;net472;netstandard2.0</TargetFrameworks>
 		<LangVersion>13.0</LangVersion>
+		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+		<AssemblyName>Microsoft.Extensions.Caching.Postgres.Tests</AssemblyName>
+		<RootNamespace>Microsoft.Extensions.Caching.Postgres.Tests</RootNamespace>
+		<IsPackable>false</IsPackable>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<Content Include="config.json" CopyToPublishDirectory="PreserveNewest" />
+		<Content Include="config.json" CopyToPublishDirectory="PreserveNewest">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
 	</ItemGroup>
 
 	<ItemGroup>
@@ -33,5 +40,11 @@
 		</PackageReference>
 		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
 	</ItemGroup>
+
+	<PropertyGroup>
+		<SignAssembly>true</SignAssembly>
+		<DelaySign>true</DelaySign>
+		<AssemblyOriginatorKeyFile>..\35MSSharedLib1024.snk</AssemblyOriginatorKeyFile>
+	</PropertyGroup>
 
 </Project>

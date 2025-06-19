@@ -33,10 +33,8 @@ public class PostgresCacheWithDatabaseTest
 
     public PostgresCacheWithDatabaseTest()
     {
-        // TODO: Figure how to use config.json which requires resolving IApplicationEnvironment which currently
-        // fails.
-
         //TODO: where/how/why is this dictionary being used?
+        /*
         var memoryConfigurationData = new Dictionary<string, string>
             {
                 // If you have to use other parameters for some reason, make sure to update this!
@@ -45,11 +43,14 @@ public class PostgresCacheWithDatabaseTest
                 { TableNameKey, "CacheTest" },
                 { CreateIfNotExistsKey, "true" },
             };
+        */
 
         var configurationBuilder = new ConfigurationBuilder();
         configurationBuilder
-            .AddInMemoryCollection(memoryConfigurationData)
-            .AddEnvironmentVariables(prefix: "PGCACHETESTS_");
+           //AddInMemoryCollection(memoryConfigurationData)
+            .AddEnvironmentVariables(prefix: "PGCACHETESTS_")
+            .AddJsonFile("config.json", optional: false, reloadOnChange: true);
+
 
         var configuration = configurationBuilder.Build();
         _tableName = configuration[TableNameKey];

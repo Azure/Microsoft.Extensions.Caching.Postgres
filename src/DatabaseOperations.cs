@@ -24,8 +24,9 @@ internal sealed class DatabaseOperations : IDatabaseOperations
 
     private bool ddlExecuted;
 
-    public DatabaseOperations(
-        string connectionString, string schemaName, string tableName, bool useWAL, bool createIfNotExists, TimeProvider timeProvider)
+    private NpgsqlDataSource ds;
+
+    public DatabaseOperations(string connectionString, string schemaName, string tableName, bool useWAL, bool createIfNotExists, TimeProvider timeProvider)
     {
         ConnectionString = connectionString;
         SchemaName = schemaName;
@@ -34,6 +35,7 @@ internal sealed class DatabaseOperations : IDatabaseOperations
         CreateIfNotExists = createIfNotExists;
         TimeProvider = timeProvider;
         SqlQueries = new SqlQueries(schemaName, tableName);
+        ds = NpgsqlDataSource.Create(ConnectionString);
     }
 
     internal SqlQueries SqlQueries { get; }
@@ -51,7 +53,8 @@ internal sealed class DatabaseOperations : IDatabaseOperations
 
     private NpgsqlConnection InitializeConnection()
     {
-        var conn = new NpgsqlConnection(ConnectionString);
+
+        var conn = ds.CreateConnection(); 
 
         if (CreateIfNotExists && !ddlExecuted)
         {

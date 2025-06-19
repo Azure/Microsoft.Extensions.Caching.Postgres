@@ -1,5 +1,0 @@
-{
-  "ConnectionString": "Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=postgres;Pooling=true;Timeout=0;Command Timeout=0;Maximum Pool Size=50;Include Error Detail=true;",
-  "SchemaName": "public",
-  "TableName": "CacheTest"
-}
