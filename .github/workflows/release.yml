@@ -1,21 +1,59 @@
+name: Release
+
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'The version to release (e.g., 1.0.0)'
+        required: true
+
+env:
+  BuildConfiguration: Release
+  PROJECT_PATH: 'src/Microsoft.Extensions.Caching.Postgres.csproj'
+  PACKAGE_OUTPUT_DIRECTORY: '${{ github.workspace }}/packages'
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    container:
-      image: mcr.microsoft.com/dotnet/sdk:9.0
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
-      - name: Restore dependencies
-        run: dotnet restore
+  build-and-publish:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/dotnet/sdk:9.0
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
 
-      - name: Build project
-        run: dotnet build --configuration Release
+    - name: Build
+      run: dotnet build ${{ env.PROJECT_PATH }} --configuration ${{ env.BuildConfiguration }} -p:Optimize=true
 
-      - name: Pack NuGet package
-        run: dotnet pack --configuration Release --output ./nupkgs
+    - name: Create NuGet Package
+      run: dotnet pack ${{ env.PROJECT_PATH }} -c ${{ env.BuildConfiguration }} --no-build --no-restore -o ${{ env.PACKAGE_OUTPUT_DIRECTORY }}
 
+    - name: Create NuGet Symbols Package
+      run: dotnet pack ${{ env.PROJECT_PATH }} -c ${{ env.BuildConfiguration }} --no-build --include-symbols /p:SymbolPackageFormat=snupkg --no-restore -o ${{ env.PACKAGE_OUTPUT_DIRECTORY }}
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: nuget-packages
+        path: ${{ env.PACKAGE_OUTPUT_DIRECTORY }}
+
+    - name: 'Login to Azure'
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: 'Copy Artifacts to Azure SDK Release blob storage'
+      uses: azure/CLI@v2
+      with:
+        inlineScript: |
+          az storage blob upload-batch \
+            --account-name azuresdkpartnerdrops \
+            --destination drops \
+            --source ${{ env.PACKAGE_OUTPUT_DIRECTORY }} \
+            --destination-path "azure-postgresql/csharp/Microsoft.Extensions.Caching.Postgres/${{ github.event.inputs.version }}" \
+            --overwrite
