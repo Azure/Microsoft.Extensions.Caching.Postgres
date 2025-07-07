@@ -10,7 +10,7 @@ on:
 env:
   BuildConfiguration: Release
   PROJECT_PATH: 'src/Microsoft.Extensions.Caching.Postgres.csproj'
-  PACKAGE_OUTPUT_DIRECTORY: '${{ github.workspace }}/packages'
+  PACKAGE_OUTPUT_DIRECTORY: '/github/workspace/packages'
 
 permissions:
   id-token: write
@@ -22,8 +22,17 @@ jobs:
     container:
       image: mcr.microsoft.com/dotnet/sdk:9.0
     steps:
+    - name: Install Azure CLI
+      run: |
+        apt-get update
+        apt-get install -y curl
+        curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+
     - name: Checkout
       uses: actions/checkout@v4
+
+    - name: Create output directory
+      run: mkdir -p ${{ env.PACKAGE_OUTPUT_DIRECTORY }}
 
     - name: Build
       run: dotnet build ${{ env.PROJECT_PATH }} --configuration ${{ env.BuildConfiguration }} -p:Optimize=true
@@ -33,6 +42,9 @@ jobs:
 
     - name: Create NuGet Symbols Package
       run: dotnet pack ${{ env.PROJECT_PATH }} -c ${{ env.BuildConfiguration }} --no-build --include-symbols /p:SymbolPackageFormat=snupkg --no-restore -o ${{ env.PACKAGE_OUTPUT_DIRECTORY }}
+
+    - name: List created packages
+      run: ls -la ${{ env.PACKAGE_OUTPUT_DIRECTORY }}
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -48,12 +60,11 @@ jobs:
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
     - name: 'Copy Artifacts to Azure SDK Release blob storage'
-      uses: azure/CLI@v2
-      with:
-        inlineScript: |
-          az storage blob upload-batch \
-            --account-name azuresdkpartnerdrops \
-            --destination drops \
-            --source ${{ env.PACKAGE_OUTPUT_DIRECTORY }} \
-            --destination-path "azure-postgresql/csharp/Microsoft.Extensions.Caching.Postgres/${{ github.event.inputs.version }}" \
-            --overwrite
+      run: |
+        az storage blob upload-batch \
+          --account-name azuresdkpartnerdrops \
+          --destination drops \
+          --source ${{ env.PACKAGE_OUTPUT_DIRECTORY }} \
+          --destination-path "azure-postgresql/csharp/Microsoft.Extensions.Caching.Postgres/${{ github.event.inputs.version }}" \
+          --overwrite \
+          --auth-mode login
