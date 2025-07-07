@@ -22,6 +22,12 @@ jobs:
     container:
       image: mcr.microsoft.com/dotnet/sdk:9.0
     steps:
+    - name: Install Azure CLI
+      run: |
+        apt-get update
+        apt-get install -y curl
+        curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+
     - name: Checkout
       uses: actions/checkout@v4
 
