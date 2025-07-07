@@ -63,7 +63,6 @@
 		<PackageReference Include="Microsoft.Extensions.Options" Version="9.0.3" />
 		<PackageReference Include="Npgsql" Condition="'$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net9.0'" Version="9.0.3" />
 		<PackageReference Include="Npgsql" Condition="'$(TargetFramework)' == 'net472' or '$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netstandard2.1'" Version="8.0.7" />
-		<PackageReference Include="Azure.Identity" Version="1.13.2" />
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(TargetFramework)' == 'net472' or '$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netstandard2.1'">
