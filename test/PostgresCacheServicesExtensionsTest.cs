@@ -37,7 +37,7 @@ public class PostgresCacheServicesExtensionsTest
         // Act
         services.AddDistributedPostgresCache(options =>
         {
-            options.ConnectionString = "Fake";
+            options.ConnectionString = "Host=Fake;Username=Fake;Password=Fake;Database=Fake;";
             options.SchemaName = "Fake";
             options.TableName = "Fake";
         });

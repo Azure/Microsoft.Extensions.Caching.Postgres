@@ -846,6 +846,7 @@ public class PostgresCacheWithDatabaseTest
             ConnectionString = _connectionString,
             SchemaName = _schemaName,
             TableName = _tableName,
+            CreateIfNotExists = _createIfNotExists,
             TimeProvider = testClock ?? new FakeTimeProvider(),
             ExpiredItemsDeletionInterval = TimeSpan.FromHours(2)
         };
