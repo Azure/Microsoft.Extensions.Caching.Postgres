@@ -10,7 +10,7 @@
 		<Nullable>enable</Nullable>
 		<NeutralLanguage>en-US</NeutralLanguage>
 		<ClientVersion>1.0.0</ClientVersion>
-		<IsPreview>true</IsPreview>
+		<IsPreview>false</IsPreview>
 		<VersionSuffix Condition=" '$(IsPreview)' == 'true' ">preview</VersionSuffix>
 		<Version Condition=" '$(VersionSuffix)' == '' ">$(ClientVersion)</Version>
 		<Version Condition=" '$(VersionSuffix)' != '' ">$(ClientVersion)-$(VersionSuffix)</Version>
@@ -27,6 +27,7 @@
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PlatformTarget>AnyCPU</PlatformTarget>
 		<ShippingScope>External</ShippingScope>
 		<SigningType>Product</SigningType>
@@ -51,6 +52,10 @@
 		<Compile Include="PostgresCachingServicesExtensions.cs" />
 		<Compile Include="SqlQueries.cs" />
 
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="README.md" Pack="true" PackagePath="\" />
 	</ItemGroup>
 <!--
 	sn -tp .\35MSSharedLib1024.snk to retrieve public key
