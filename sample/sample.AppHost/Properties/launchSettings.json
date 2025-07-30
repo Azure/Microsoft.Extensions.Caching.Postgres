@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:17001;http://localhost:15294",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "DOTNET_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21195",
+        "DOTNET_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22069",
+        "ConnectionStrings__PostgresCache": "Host=postgres;Username=postgres;Password=postgres;Database=postgres;Pooling=true;MinPoolSize=0;MaxPoolSize=100;Timeout=15;"
+      }
+    },
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:15294",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "DOTNET_DASHBOARD_OTLP_ENDPOINT_URL": "http://localhost:19081",
+        "DOTNET_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:20067",
+        "ConnectionStrings__PostgresCache": "Host=postgres;Username=postgres;Password=postgres;Database=postgres;Pooling=true;MinPoolSize=0;MaxPoolSize=100;Timeout=15;"
+      }
+    }
+  }
+}
