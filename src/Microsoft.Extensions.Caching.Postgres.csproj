@@ -27,13 +27,16 @@
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PlatformTarget>AnyCPU</PlatformTarget>
 		<ShippingScope>External</ShippingScope>
 		<SigningType>Product</SigningType>
-		<RepositoryUrl>https://github.com/Azure/Microsoft.Extensions.Caching.Postgres</RepositoryUrl>
-		<PackageProjectUrl>https://github.com/Azure/Microsoft.Extensions.Caching.Postgres</PackageProjectUrl>
-		<TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-		<EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+
+		<Compile Include="SqlQueries.cs" />
+
+		<ItemGroup>
+			<None Include="README.md" Pack="true" PackagePath="\" />
+		</ItemGroup>
 
 	</PropertyGroup>
 
