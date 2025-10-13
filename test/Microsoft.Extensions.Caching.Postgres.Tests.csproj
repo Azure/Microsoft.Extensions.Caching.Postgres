@@ -18,7 +18,6 @@
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="9.0.7" PrivateAssets="All" />
-		<PackageReference Include="Microsoft.Extensions.Caching.Postgres" Version="1.0.0" />
 		<PackageReference Include="Npgsql" Condition="'$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net9.0'" Version="9.0.3" />
 		<PackageReference Include="Npgsql" Condition="'$(TargetFramework)' == 'net472' or '$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netstandard2.1'" Version="8.0.7" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.7" />
@@ -39,6 +38,10 @@
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+	</ItemGroup>
+	
+	<ItemGroup>
+	  <ProjectReference Include="..\src\Microsoft.Extensions.Caching.Postgres.csproj" />
 	</ItemGroup>
 
 	<PropertyGroup>

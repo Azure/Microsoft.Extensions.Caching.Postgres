@@ -9,7 +9,7 @@
 		<LangVersion>13.0</LangVersion>
 		<Nullable>enable</Nullable>
 		<NeutralLanguage>en-US</NeutralLanguage>
-		<ClientVersion>1.0.0</ClientVersion>
+		<ClientVersion>1.1.0</ClientVersion>
 		<IsPreview>false</IsPreview>
 		<VersionSuffix Condition=" '$(IsPreview)' == 'true' ">preview</VersionSuffix>
 		<Version Condition=" '$(VersionSuffix)' == '' ">$(ClientVersion)</Version>
@@ -57,7 +57,7 @@
 	<ItemGroup>
 		<None Include="README.md" Pack="true" PackagePath="\" />
 	</ItemGroup>
-<!--
+	<!--
 	sn -tp .\35MSSharedLib1024.snk to retrieve public key
 	<ItemGroup>
 		<InternalsVisibleTo Include="Microsoft.Extensions.Caching.Postgres.Tests" />
