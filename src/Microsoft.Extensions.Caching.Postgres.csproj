@@ -10,7 +10,7 @@
 		<Nullable>enable</Nullable>
 		<NeutralLanguage>en-US</NeutralLanguage>
 		<ClientVersion>1.1.0</ClientVersion>
-		<IsPreview>true</IsPreview>
+		<IsPreview>false</IsPreview>
 		<VersionSuffix Condition=" '$(IsPreview)' == 'true' ">preview</VersionSuffix>
 		<Version Condition=" '$(VersionSuffix)' == '' ">$(ClientVersion)</Version>
 		<Version Condition=" '$(VersionSuffix)' != '' ">$(ClientVersion)-$(VersionSuffix)</Version>
