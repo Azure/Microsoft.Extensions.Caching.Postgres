@@ -22,7 +22,8 @@ internal sealed class DatabaseOperations : IDatabaseOperations
 
     private const string UtcNowParameterName = "@utcNow";
 
-    private bool ddlExecuted;
+    private volatile bool ddlExecuted;
+    private readonly object ddlLock = new object();
 
     private NpgsqlDataSource ds;
 
@@ -54,15 +55,17 @@ internal sealed class DatabaseOperations : IDatabaseOperations
     private NpgsqlConnection InitializeConnection()
     {
 
-        var conn = ds.CreateConnection(); 
+        var conn = ds.CreateConnection();
 
-        if (CreateIfNotExists && !ddlExecuted)
-        {
-            var sql = string.Join(";", SqlQueries.CreateSchema, SqlQueries.CreateTable, SqlQueries.CreateIndex);
-            conn.Open();
-            using (var command = new NpgsqlCommand(sql, conn)) { command.ExecuteNonQuery(); }
-            conn.Close();
-            ddlExecuted = true;
+        lock (ddlLock) {
+
+            if (!ddlExecuted && CreateIfNotExists) {
+                var sql = string.Join(";", SqlQueries.CreateSchema, SqlQueries.CreateTable, SqlQueries.CreateIndex);
+                conn.Open();
+                using (var command = new NpgsqlCommand(sql, conn)) { command.ExecuteNonQuery(); }
+                conn.Close();
+                ddlExecuted = true;
+            }
         }
 
         return conn;

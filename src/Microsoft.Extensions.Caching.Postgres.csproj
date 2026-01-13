@@ -9,7 +9,7 @@
 		<LangVersion>13.0</LangVersion>
 		<Nullable>enable</Nullable>
 		<NeutralLanguage>en-US</NeutralLanguage>
-		<ClientVersion>1.0.0</ClientVersion>
+		<ClientVersion>1.2.0</ClientVersion>
 		<IsPreview>false</IsPreview>
 		<VersionSuffix Condition=" '$(IsPreview)' == 'true' ">preview</VersionSuffix>
 		<Version Condition=" '$(VersionSuffix)' == '' ">$(ClientVersion)</Version>
