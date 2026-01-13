@@ -2,7 +2,7 @@
 
 	<PropertyGroup>
 		<IsTestProject>true</IsTestProject>
-		<TargetFrameworks>net10.0;net9.0;net8.0;net6.0;netstandard2.0;net472</TargetFrameworks>
+		<TargetFrameworks>net10.0;net9.0;net8.0;net6.0;net481;net472</TargetFrameworks>
 		<LangVersion>13.0</LangVersion>
 		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
 		<AssemblyName>Microsoft.Extensions.Caching.Postgres.Tests</AssemblyName>
@@ -56,13 +56,15 @@
 	</ItemGroup>
 
 	<!-- Npgsql: net6.0, netstandard2.0, net472 -->
-	<ItemGroup Condition="'$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'net472' or '$(TargetFramework)' == 'netstandard2.0'">
+	<ItemGroup Condition="'$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'net481' or '$(TargetFramework)' == 'net472'">
 		<PackageReference Include="Npgsql" Version="8.0.7" />
 	</ItemGroup>
 
 	<!-- Suppress TFM support warnings/errors for older frameworks using polyfill packages -->
-	<PropertyGroup Condition="'$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'net472' or '$(TargetFramework)' == 'netstandard2.0'">
+	<PropertyGroup Condition="'$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'net481' or '$(TargetFramework)' == 'net472'">
 		<SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+		<!-- NU1701: xunit.runner.visualstudio doesn't have net6.0 build but works fine -->
+		<NoWarn>$(NoWarn);NU1701</NoWarn>
 	</PropertyGroup>
 
 	<PropertyGroup>
