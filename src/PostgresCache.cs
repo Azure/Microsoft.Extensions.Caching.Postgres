@@ -8,14 +8,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
+using Npgsql;
 
 namespace Microsoft.Extensions.Caching.Postgres;
 
 /// <summary>
 /// Distributed cache implementation using Postgres database.
 /// </summary>
-public class PostgresCache : IDistributedCache, IBufferDistributedCache
-{
+public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncDisposable {
     private static readonly TimeSpan MinimumExpiredItemsDeletionInterval = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan DefaultExpiredItemsDeletionInterval = TimeSpan.FromMinutes(30);
 
@@ -31,8 +31,7 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache
     /// Initializes a new instance of <see cref="PostgresCache"/>.
     /// </summary>
     /// <param name="options">The configuration options.</param>
-    public PostgresCache(IOptions<PostgresCacheOptions> options)
-    {
+    public PostgresCache(IOptions<PostgresCacheOptions> options) {
         var cacheOptions = options.Value;
 
         ArgumentThrowHelper.ThrowIfNullOrEmpty(cacheOptions.ConnectionString);
@@ -40,14 +39,12 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache
         ArgumentThrowHelper.ThrowIfNullOrEmpty(cacheOptions.TableName);
 
         if (cacheOptions.ExpiredItemsDeletionInterval.HasValue &&
-            cacheOptions.ExpiredItemsDeletionInterval.Value < MinimumExpiredItemsDeletionInterval)
-        {
+            cacheOptions.ExpiredItemsDeletionInterval.Value < MinimumExpiredItemsDeletionInterval) {
             throw new ArgumentException(
                 $"{nameof(PostgresCacheOptions.ExpiredItemsDeletionInterval)} cannot be less than the minimum " +
                 $"value of {MinimumExpiredItemsDeletionInterval.TotalMinutes} minutes.");
         }
-        if (cacheOptions.DefaultSlidingExpiration <= TimeSpan.Zero)
-        {
+        if (cacheOptions.DefaultSlidingExpiration <= TimeSpan.Zero) {
 #pragma warning disable CA2208 // Instantiate argument exceptions correctly
             throw new ArgumentOutOfRangeException(
                 nameof(cacheOptions.DefaultSlidingExpiration),
@@ -62,18 +59,34 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache
         _deleteExpiredCachedItemsDelegate = DeleteExpiredCacheItems;
         _defaultSlidingExpiration = cacheOptions.DefaultSlidingExpiration;
 
+        // Build DatabaseOperations with a data source configured via the builder callback if provided
+        NpgsqlDataSource dataSource;
+        if (cacheOptions.ConfigureDataSourceBuilder is not null) {
+            var builder = new NpgsqlDataSourceBuilder(cacheOptions.ConnectionString!);
+            cacheOptions.ConfigureDataSourceBuilder(builder);
+            dataSource = builder.Build();
+        }
+        else {
+            dataSource = NpgsqlDataSource.Create(cacheOptions.ConnectionString!);
+        }
+
         _dbOperations = new DatabaseOperations(
-            cacheOptions.ConnectionString,
-            cacheOptions.SchemaName,
-            cacheOptions.TableName,
+            dataSource,
+            cacheOptions.SchemaName!,
+            cacheOptions.TableName!,
             cacheOptions.UseWAL ?? false,
             cacheOptions.CreateIfNotExists ?? false,
             _timeProvider);
     }
 
+    public async ValueTask DisposeAsync() {
+        if (_dbOperations is IAsyncDisposable asyncDisposable) {
+            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
     /// <inheritdoc />
-    public byte[]? Get(string key)
-    {
+    public byte[]? Get(string key) {
         ArgumentNullThrowHelper.ThrowIfNull(key);
 
         var value = _dbOperations.GetCacheItem(key);
@@ -83,8 +96,7 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache
         return value;
     }
 
-    bool IBufferDistributedCache.TryGet(string key, IBufferWriter<byte> destination)
-    {
+    bool IBufferDistributedCache.TryGet(string key, IBufferWriter<byte> destination) {
         ArgumentNullThrowHelper.ThrowIfNull(key);
         ArgumentNullThrowHelper.ThrowIfNull(destination);
 
@@ -96,8 +108,7 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache
     }
 
     /// <inheritdoc />
-    public async Task<byte[]?> GetAsync(string key, CancellationToken token = default(CancellationToken))
-    {
+    public async Task<byte[]?> GetAsync(string key, CancellationToken token = default(CancellationToken)) {
         ArgumentNullThrowHelper.ThrowIfNull(key);
 
         token.ThrowIfCancellationRequested();
@@ -109,8 +120,7 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache
         return value;
     }
 
-    async ValueTask<bool> IBufferDistributedCache.TryGetAsync(string key, IBufferWriter<byte> destination, CancellationToken token)
-    {
+    async ValueTask<bool> IBufferDistributedCache.TryGetAsync(string key, IBufferWriter<byte> destination, CancellationToken token) {
         ArgumentNullThrowHelper.ThrowIfNull(key);
         ArgumentNullThrowHelper.ThrowIfNull(destination);
 
@@ -122,8 +132,7 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache
     }
 
     /// <inheritdoc />
-    public void Refresh(string key)
-    {
+    public void Refresh(string key) {
         ArgumentNullThrowHelper.ThrowIfNull(key);
 
         _dbOperations.RefreshCacheItem(key);
@@ -132,8 +141,7 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache
     }
 
     /// <inheritdoc />
-    public async Task RefreshAsync(string key, CancellationToken token = default(CancellationToken))
-    {
+    public async Task RefreshAsync(string key, CancellationToken token = default(CancellationToken)) {
         ArgumentNullThrowHelper.ThrowIfNull(key);
 
         token.ThrowIfCancellationRequested();
@@ -144,8 +152,7 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache
     }
 
     /// <inheritdoc />
-    public void Remove(string key)
-    {
+    public void Remove(string key) {
         ArgumentNullThrowHelper.ThrowIfNull(key);
 
         _dbOperations.DeleteCacheItem(key);
@@ -154,8 +161,7 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache
     }
 
     /// <inheritdoc />
-    public async Task RemoveAsync(string key, CancellationToken token = default(CancellationToken))
-    {
+    public async Task RemoveAsync(string key, CancellationToken token = default(CancellationToken)) {
         ArgumentNullThrowHelper.ThrowIfNull(key);
 
         token.ThrowIfCancellationRequested();
@@ -166,8 +172,7 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache
     }
 
     /// <inheritdoc />
-    public void Set(string key, byte[] value, DistributedCacheEntryOptions options)
-    {
+    public void Set(string key, byte[] value, DistributedCacheEntryOptions options) {
         ArgumentNullThrowHelper.ThrowIfNull(key);
         ArgumentNullThrowHelper.ThrowIfNull(value);
         ArgumentNullThrowHelper.ThrowIfNull(options);
@@ -179,8 +184,7 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache
         ScanForExpiredItemsIfRequired();
     }
 
-    void IBufferDistributedCache.Set(string key, ReadOnlySequence<byte> value, DistributedCacheEntryOptions options)
-    {
+    void IBufferDistributedCache.Set(string key, ReadOnlySequence<byte> value, DistributedCacheEntryOptions options) {
         ArgumentNullThrowHelper.ThrowIfNull(key);
         ArgumentNullThrowHelper.ThrowIfNull(options);
 
@@ -197,8 +201,7 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache
         string key,
         byte[] value,
         DistributedCacheEntryOptions options,
-        CancellationToken token = default(CancellationToken))
-    {
+        CancellationToken token = default(CancellationToken)) {
         ArgumentNullThrowHelper.ThrowIfNull(key);
         ArgumentNullThrowHelper.ThrowIfNull(value);
         ArgumentNullThrowHelper.ThrowIfNull(options);
@@ -216,8 +219,7 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache
         string key,
         ReadOnlySequence<byte> value,
         DistributedCacheEntryOptions options,
-        CancellationToken token)
-    {
+        CancellationToken token) {
         ArgumentNullThrowHelper.ThrowIfNull(key);
         ArgumentNullThrowHelper.ThrowIfNull(options);
 
@@ -231,10 +233,8 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache
         ScanForExpiredItemsIfRequired();
     }
 
-    private static ArraySegment<byte> Linearize(in ReadOnlySequence<byte> value, out byte[]? lease)
-    {
-        if (value.IsEmpty)
-        {
+    private static ArraySegment<byte> Linearize(in ReadOnlySequence<byte> value, out byte[]? lease) {
+        if (value.IsEmpty) {
             lease = null;
             return new([], 0, 0);
         }
@@ -242,8 +242,7 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache
         // SqlClient only supports single-segment chunks via byte[] with offset/count; this will
         // almost never be an issue, but on those rare occasions: use a leased array to harmonize things
         // TODO Postgres impact?
-        if (value.IsSingleSegment && MemoryMarshal.TryGetArray(value.First, out var segment))
-        {
+        if (value.IsSingleSegment && MemoryMarshal.TryGetArray(value.First, out var segment)) {
             lease = null;
             return segment;
         }
@@ -253,42 +252,33 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache
         return new(lease, 0, length);
     }
 
-    private static void Recycle(byte[]? lease)
-    {
-        if (lease is not null)
-        {
+    private static void Recycle(byte[]? lease) {
+        if (lease is not null) {
             ArrayPool<byte>.Shared.Return(lease);
         }
     }
 
     // Called by multiple actions to see how long it's been since we last checked for expired items.
     // If sufficient time has elapsed then a scan is initiated on a background task.
-    private void ScanForExpiredItemsIfRequired()
-    {
-        lock (_mutex)
-        {
+    private void ScanForExpiredItemsIfRequired() {
+        lock (_mutex) {
             var utcNow = _timeProvider.GetUtcNow();
-            if ((utcNow - _lastExpirationScan) > _expiredItemsDeletionInterval)
-            {
+            if ((utcNow - _lastExpirationScan) > _expiredItemsDeletionInterval) {
                 _lastExpirationScan = utcNow;
                 Task.Run(_deleteExpiredCachedItemsDelegate);
             }
         }
     }
 
-    private void DeleteExpiredCacheItems()
-    {
+    private void DeleteExpiredCacheItems() {
         _dbOperations.DeleteExpiredCacheItems();
     }
 
-    private void GetOptions(ref DistributedCacheEntryOptions options)
-    {
+    private void GetOptions(ref DistributedCacheEntryOptions options) {
         if (!options.AbsoluteExpiration.HasValue
             && !options.AbsoluteExpirationRelativeToNow.HasValue
-            && !options.SlidingExpiration.HasValue)
-        {
-            options = new DistributedCacheEntryOptions()
-            {
+            && !options.SlidingExpiration.HasValue) {
+            options = new DistributedCacheEntryOptions() {
                 SlidingExpiration = _defaultSlidingExpiration
             };
         }

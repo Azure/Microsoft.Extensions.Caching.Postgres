@@ -36,4 +36,8 @@
 	</ItemGroup>
 
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Microsoft.Extensions.Caching.Postgres.csproj" />
+  </ItemGroup>
+
 </Project>

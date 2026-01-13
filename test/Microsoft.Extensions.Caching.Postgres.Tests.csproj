@@ -16,11 +16,6 @@
 		</Content>
 	</ItemGroup>
 
-	<!-- Common dependencies -->
-	<ItemGroup>
-		<ProjectReference Include="..\src\Microsoft.Extensions.Caching.Postgres.csproj" />		
-	</ItemGroup>
-
 	<!-- Microsoft.Extensions packages (all frameworks use 10.x to match main project) -->
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Bcl.TimeProvider" Version="10.0.1" />
@@ -43,6 +38,10 @@
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
+	</ItemGroup>
+	
+	<ItemGroup>
+	  <ProjectReference Include="..\src\Microsoft.Extensions.Caching.Postgres.csproj" />
 	</ItemGroup>
 
 	<!-- Npgsql: net10.0 -->

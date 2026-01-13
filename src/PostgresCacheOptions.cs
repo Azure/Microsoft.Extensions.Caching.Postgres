@@ -3,14 +3,14 @@
 
 using System;
 using Microsoft.Extensions.Options;
+using Npgsql;
 
 namespace Microsoft.Extensions.Caching.Postgres;
 
 /// <summary>
 /// Configuration options for <see cref="PostgresCache"/>.
 /// </summary>
-public class PostgresCacheOptions : IOptions<PostgresCacheOptions>
-{
+public class PostgresCacheOptions : IOptions<PostgresCacheOptions> {
     /// <summary>
     /// An abstraction to represent the clock of a machine in order to enable unit testing.
     /// </summary>
@@ -25,6 +25,13 @@ public class PostgresCacheOptions : IOptions<PostgresCacheOptions>
     /// The connection string to the database.
     /// </summary>
     public string? ConnectionString { get; set; }
+
+    /// <summary>
+    /// Optional callback to configure an <see cref="NpgsqlDataSourceBuilder"/> created from <see cref="ConnectionString"/>.
+    /// This allows callers to supply custom authentication (e.g., Entra ID via periodic password provider),
+    /// plugins, or other data source settings.
+    /// </summary>
+    public Action<NpgsqlDataSourceBuilder>? ConfigureDataSourceBuilder { get; set; }
 
     /// <summary>
     /// The schema name of the table.
@@ -52,10 +59,8 @@ public class PostgresCacheOptions : IOptions<PostgresCacheOptions>
     /// </summary>
     public TimeSpan DefaultSlidingExpiration { get; set; } = TimeSpan.FromMinutes(20);
 
-    PostgresCacheOptions IOptions<PostgresCacheOptions>.Value
-    {
-        get
-        {
+    PostgresCacheOptions IOptions<PostgresCacheOptions>.Value {
+        get {
             return this;
         }
     }
