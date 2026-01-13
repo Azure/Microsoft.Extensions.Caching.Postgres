@@ -40,6 +40,8 @@ internal sealed class SqlQueries
 
     public const string DeleteExpiredCacheItemsFormat = "DELETE FROM {0} WHERE expiresAtTime < @utcNow";
 
+    private const string CreateSchemaFormat = "CREATE SCHEMA IF NOT EXISTS {0}";
+
     private const string CreateTableFormat = """
         CREATE {1} TABLE IF NOT EXISTS {0} (
             id VARCHAR(449) COLLATE "C" PRIMARY KEY,
@@ -65,7 +67,8 @@ internal sealed class SqlQueries
         GetCacheItemWithoutValue = string.Format(CultureInfo.InvariantCulture, UpdateCacheItemFormat, tableNameWithSchema);
         DeleteCacheItem = string.Format(CultureInfo.InvariantCulture, DeleteCacheItemFormat, tableNameWithSchema);
         DeleteExpiredCacheItems = string.Format(CultureInfo.InvariantCulture, DeleteExpiredCacheItemsFormat, tableNameWithSchema);
-        SetCacheItem = string.Format(CultureInfo.InvariantCulture, SetCacheItemFormat, tableNameWithSchema);      
+        SetCacheItem = string.Format(CultureInfo.InvariantCulture, SetCacheItemFormat, tableNameWithSchema);
+        CreateSchema = string.Format(CultureInfo.InvariantCulture, CreateSchemaFormat, schemaName, logType);
         CreateTable = string.Format(CultureInfo.InvariantCulture, CreateTableFormat, tableNameWithSchema, logType);
         CreateIndex = string.Format(CultureInfo.InvariantCulture, CreateNonClusteredIndexOnExpirationTimeFormat,tableNameWithSchema);
     }
@@ -79,6 +82,8 @@ internal sealed class SqlQueries
     public string DeleteCacheItem { get; }
 
     public string DeleteExpiredCacheItems { get; }
+
+    public string CreateSchema { get; }
     public string CreateTable { get; }
     public string CreateIndex { get; }
 

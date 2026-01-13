@@ -58,7 +58,7 @@ internal sealed class DatabaseOperations : IDatabaseOperations
 
         if (CreateIfNotExists && !ddlExecuted)
         {
-            var sql = string.Join(";", SqlQueries.CreateTable, SqlQueries.CreateIndex);
+            var sql = string.Join(";", SqlQueries.CreateSchema, SqlQueries.CreateTable, SqlQueries.CreateIndex);
             conn.Open();
             using (var command = new NpgsqlCommand(sql, conn)) { command.ExecuteNonQuery(); }
             conn.Close();
