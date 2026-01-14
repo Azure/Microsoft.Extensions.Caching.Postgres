@@ -20,7 +20,7 @@ jobs:
   build-and-publish:
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/dotnet/sdk:9.0
+      image: mcr.microsoft.com/dotnet/sdk:latest
     steps:
     - name: Install Azure CLI
       run: |
