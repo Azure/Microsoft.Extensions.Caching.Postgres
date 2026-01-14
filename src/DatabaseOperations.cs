@@ -52,8 +52,6 @@ internal sealed class DatabaseOperations : IDatabaseOperations, IAsyncDisposable
     private NpgsqlConnection InitializeConnection() {
         var conn = ds.CreateConnection();
 
-        var conn = ds.CreateConnection();
-
         lock (ddlLock) {
 
             if (!ddlExecuted && CreateIfNotExists) {

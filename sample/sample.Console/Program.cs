@@ -21,10 +21,8 @@ var host = Host.CreateDefaultBuilder(args)
 
             options.ConnectionString = context.Configuration.GetConnectionString("PostgresCache");
 
-            // Example: periodically supply a password/token for auth (e.g., Entra access token)
-            options.ConfigureDataSourceBuilder = builder => {
-                builder.UseEntraAuthentication();
-            };
+            // Example: periodically supply a password/token for auth (e.g., Entra access token) Uncomment following line to use Entra authentication:
+            //options.ConfigureDataSourceBuilder = builder => { builder.UseEntraAuthentication(); };
 
             options.SchemaName = context.Configuration.GetValue<string>("PostgresCache:SchemaName", "public");
             options.TableName = context.Configuration.GetValue<string>("PostgresCache:TableName", "__cache");
