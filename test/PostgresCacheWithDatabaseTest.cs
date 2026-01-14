@@ -892,7 +892,7 @@ public class PostgresCacheWithDatabaseTest
                 {
                     Id = key,
                     Value = (byte[])reader[1],
-                    ExpiresAtTime = DateTimeOffset.Parse(reader[2].ToString(), CultureInfo.InvariantCulture)
+                    ExpiresAtTime = DateTimeOffset.Parse(reader[2].ToString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal)
                 };
 
                 if (!await reader.IsDBNullAsync(3))
@@ -902,7 +902,7 @@ public class PostgresCacheWithDatabaseTest
 
                 if (!await reader.IsDBNullAsync(4))
                 {
-                    cacheItemInfo.AbsoluteExpiration = DateTimeOffset.Parse(reader[4].ToString(), CultureInfo.InvariantCulture);
+                    cacheItemInfo.AbsoluteExpiration = DateTimeOffset.Parse(reader[4].ToString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
                 }
 
                 return cacheItemInfo;

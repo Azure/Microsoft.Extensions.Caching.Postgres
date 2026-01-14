@@ -5,11 +5,11 @@
 		<Description>Distributed cache implementation of Microsoft.Extensions.Caching.Distributed.IDistributedCache using Postgres.</Description>
 		<Copyright>© Microsoft Corporation. All rights reserved.</Copyright>
 		<CurrentDate>$([System.DateTime]::Now.ToString(yyyyMMdd))</CurrentDate>
-		<TargetFrameworks>net8.0;net9.0;net472;netstandard2.0</TargetFrameworks>
+		<TargetFrameworks>net10.0;net9.0;net8.0;net6.0;netstandard2.0;net472</TargetFrameworks>
 		<LangVersion>13.0</LangVersion>
 		<Nullable>enable</Nullable>
 		<NeutralLanguage>en-US</NeutralLanguage>
-		<ClientVersion>1.1.0</ClientVersion>
+		<ClientVersion>1.2.0</ClientVersion>
 		<IsPreview>false</IsPreview>
 		<VersionSuffix Condition=" '$(IsPreview)' == 'true' ">preview</VersionSuffix>
 		<Version Condition=" '$(VersionSuffix)' == '' ">$(ClientVersion)</Version>
@@ -63,16 +63,32 @@
 		<InternalsVisibleTo Include="Microsoft.Extensions.Caching.Postgres.Tests" />
 	</ItemGroup>
 -->
+	<!-- Common dependencies -->
 	<ItemGroup>
-		<PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="[9.0.7,)" />
-		<PackageReference Include="Microsoft.Extensions.Options" Version="[9.0.7,)" />
-		<PackageReference Include="Npgsql" Condition="'$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net9.0'" Version="[9.0.3,)" />
-		<PackageReference Include="Npgsql" Condition="'$(TargetFramework)' == 'net472' or '$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netstandard2.1'" Version="8.0.7" />
+		<PackageReference Include="Microsoft.Bcl.TimeProvider" Version="10.0.1" />
+		<PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.1" />
+		<PackageReference Include="Microsoft.Extensions.Options" Version="10.0.1" />
 	</ItemGroup>
 
-	<ItemGroup Condition="'$(TargetFramework)' == 'net472' or '$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netstandard2.1'">
-		<PackageReference Include="Microsoft.Bcl.TimeProvider" Version="[9.0.7,)" />
+	<!-- Npgsql: net10.0 -->
+	<ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+		<PackageReference Include="Npgsql" Version="10.0.1" />
 	</ItemGroup>
+
+	<!-- Npgsql: net8.0, net9.0 -->
+	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net9.0'">
+		<PackageReference Include="Npgsql" Version="9.0.3" />
+	</ItemGroup>
+
+	<!-- Npgsql + polyfills: net6.0, netstandard2.0, net472 -->
+	<ItemGroup Condition="'$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'net472' or '$(TargetFramework)' == 'netstandard2.0'">
+		<PackageReference Include="Npgsql" Version="8.0.7" />		
+	</ItemGroup>
+
+	<!-- Suppress TFM support warnings for older frameworks using polyfill packages -->
+	<PropertyGroup Condition="'$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'net472' or '$(TargetFramework)' == 'netstandard2.0'">
+		<SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+	</PropertyGroup>
 
 	<PropertyGroup>
 		<SignAssembly>true</SignAssembly>

@@ -2,7 +2,7 @@
 
 	<PropertyGroup>
 		<IsTestProject>true</IsTestProject>
-		<TargetFrameworks>net8.0;net9.0;net472;netstandard2.0</TargetFrameworks>
+		<TargetFrameworks>net10.0;net9.0;net8.0;net6.0;net481;net472</TargetFrameworks>
 		<LangVersion>13.0</LangVersion>
 		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
 		<AssemblyName>Microsoft.Extensions.Caching.Postgres.Tests</AssemblyName>
@@ -16,33 +16,55 @@
 		</Content>
 	</ItemGroup>
 
+	<!-- Microsoft.Extensions packages (all frameworks use 10.x to match main project) -->
 	<ItemGroup>
-		<PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="9.0.7" PrivateAssets="All" />
-		<PackageReference Include="Npgsql" Condition="'$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net9.0'" Version="9.0.3" />
-		<PackageReference Include="Npgsql" Condition="'$(TargetFramework)' == 'net472' or '$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netstandard2.1'" Version="8.0.7" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.7" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="9.0.7" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.7" />
-		<PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.7" />
-		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.7" />
-		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.7" />
-		<PackageReference Include="Microsoft.Extensions.Options" Version="9.0.7" PrivateAssets="All" />
-		<PackageReference Include="Moq" Version="4.20.72" />
-		<PackageReference Include="Microsoft.Bcl.TimeProvider" Version="9.0.7" PrivateAssets="All" />
+		<PackageReference Include="Microsoft.Bcl.TimeProvider" Version="10.0.1" />
+		<PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.1" PrivateAssets="All" />
+		<PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.1" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.1" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.1" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.1" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.1" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.1" />
+		<PackageReference Include="Microsoft.Extensions.Options" Version="10.0.1" PrivateAssets="All" />
+		<PackageReference Include="Moq" Version="4.20.72" />		
 	</ItemGroup>
-	
+
+	<!-- Test framework -->
 	<ItemGroup>
+		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
 		<PackageReference Include="xunit" Version="2.9.3" />
-		<PackageReference Include="xunit.runner.visualstudio" Version="3.1.3">
+		<PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
 	</ItemGroup>
 	
 	<ItemGroup>
 	  <ProjectReference Include="..\src\Microsoft.Extensions.Caching.Postgres.csproj" />
 	</ItemGroup>
+
+	<!-- Npgsql: net10.0 -->
+	<ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+		<PackageReference Include="Npgsql" Version="10.0.1" />
+	</ItemGroup>
+
+	<!-- Npgsql: net8.0, net9.0 -->
+	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net9.0'">
+		<PackageReference Include="Npgsql" Version="9.0.3" />
+	</ItemGroup>
+
+	<!-- Npgsql: net6.0, netstandard2.0, net472 -->
+	<ItemGroup Condition="'$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'net481' or '$(TargetFramework)' == 'net472'">
+		<PackageReference Include="Npgsql" Version="8.0.7" />
+	</ItemGroup>
+
+	<!-- Suppress TFM support warnings/errors for older frameworks using polyfill packages -->
+	<PropertyGroup Condition="'$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'net481' or '$(TargetFramework)' == 'net472'">
+		<SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+		<!-- NU1701: xunit.runner.visualstudio doesn't have net6.0 build but works fine -->
+		<NoWarn>$(NoWarn);NU1701</NoWarn>
+	</PropertyGroup>
 
 	<PropertyGroup>
 		<SuppressTfmSupportBuildErrors>true</SuppressTfmSupportBuildErrors>
