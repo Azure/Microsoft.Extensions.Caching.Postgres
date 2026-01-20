@@ -33,7 +33,7 @@ internal sealed class DatabaseOperations : IDatabaseOperations, IAsyncDisposable
         UseWAL = useWAL;
         CreateIfNotExists = createIfNotExists;
         TimeProvider = timeProvider;
-        SqlQueries = new SqlQueries(schemaName, tableName);
+        SqlQueries = new SqlQueries(schemaName, tableName, useWAL);
     }
 
     internal SqlQueries SqlQueries { get; }
