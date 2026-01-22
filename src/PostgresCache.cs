@@ -34,7 +34,10 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
     public PostgresCache(IOptions<PostgresCacheOptions> options) {
         var cacheOptions = options.Value;
 
-        ArgumentThrowHelper.ThrowIfNullOrEmpty(cacheOptions.ConnectionString);
+        // If a pre-configured DataSource is provided, ConnectionString is not required.
+        if (cacheOptions.DataSource is null) {
+            ArgumentThrowHelper.ThrowIfNullOrEmpty(cacheOptions.ConnectionString);
+        }
         ArgumentThrowHelper.ThrowIfNullOrEmpty(cacheOptions.SchemaName);
         ArgumentThrowHelper.ThrowIfNullOrEmpty(cacheOptions.TableName);
 
@@ -61,7 +64,11 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
 
         // Build DatabaseOperations with a data source configured via the builder callback if provided
         NpgsqlDataSource dataSource;
-        if (cacheOptions.ConfigureDataSourceBuilder is not null) {
+        if (cacheOptions.DataSource is not null) {
+            // Use the pre-configured data source if provided
+            dataSource = cacheOptions.DataSource;
+        }
+        else if (cacheOptions.ConfigureDataSourceBuilder is not null) {
             var builder = new NpgsqlDataSourceBuilder(cacheOptions.ConnectionString!);
             cacheOptions.ConfigureDataSourceBuilder(builder);
             dataSource = builder.Build();
@@ -79,6 +86,7 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
             _timeProvider);
     }
 
+    /// <inheritdoc />
     public async ValueTask DisposeAsync() {
         if (_dbOperations is IAsyncDisposable asyncDisposable) {
             await asyncDisposable.DisposeAsync().ConfigureAwait(false);
