@@ -34,6 +34,12 @@ public class PostgresCacheOptions : IOptions<PostgresCacheOptions> {
     public Action<NpgsqlDataSourceBuilder>? ConfigureDataSourceBuilder { get; set; }
 
     /// <summary>
+    /// Optional pre-configured <see cref="NpgsqlDataSource"/>. When provided, this takes precedence over
+    /// <see cref="ConnectionString"/> and <see cref="ConfigureDataSourceBuilder"/>.
+    /// </summary>
+    public NpgsqlDataSource? DataSource { get; set; }
+
+    /// <summary>
     /// The schema name of the table.
     /// </summary>
     public string? SchemaName { get; set; }
