@@ -114,12 +114,25 @@ public static class PostgresCachingServicesExtensions {
 
         services.AddOptions();
         AddPostgresCacheServices(services);
-        // Register the data source as a singleton resolved by the provided factory
-        services.AddSingleton<NpgsqlDataSource>(dataSourceFactory);
-        // Configure PostgresCacheOptions to pull the data source from DI when options are constructed
-        services.AddSingleton<IConfigureOptions<PostgresCacheOptions>>(sp => new ConfigureOptions<PostgresCacheOptions>(opts => {
-            opts.DataSource = sp.GetRequiredService<NpgsqlDataSource>();
-        }));
+        // If a data source hasn't already been registered, register the provided factory as the
+        // singleton provider. If the application already registered an NpgsqlDataSource (for
+        // example via AddNpgsqlDataSource), do not overwrite it to avoid re-entrancy or
+        // circular resolution when users pass factories that resolve the data source from DI.
+        var alreadyRegistered = false;
+        foreach (var sd in services) {
+            if (sd.ServiceType == typeof(NpgsqlDataSource)) {
+                alreadyRegistered = true;
+                break;
+            }
+        }
+
+        if (!alreadyRegistered) {
+            services.AddSingleton<NpgsqlDataSource>(dataSourceFactory);
+            // Configure options to set DataSource to the resolved singleton so IOptions contains it.
+            services.AddSingleton<IConfigureOptions<PostgresCacheOptions>>(sp => new ConfigureOptions<PostgresCacheOptions>(opts => {
+                opts.DataSource = sp.GetRequiredService<NpgsqlDataSource>();
+            }));
+        }
 
         return services;
     }
@@ -141,14 +154,32 @@ public static class PostgresCachingServicesExtensions {
 
         services.AddOptions();
         AddPostgresCacheServices(services);
-        services.AddSingleton<NpgsqlDataSource>(dataSourceFactory);
-        services.AddSingleton<IConfigureOptions<PostgresCacheOptions>>(sp => new ConfigureOptions<PostgresCacheOptions>(opts => {
-            configure(opts);
-            opts.DataSource = sp.GetRequiredService<NpgsqlDataSource>();
-        }));
+        var alreadyRegistered = false;
+        foreach (var sd in services) {
+            if (sd.ServiceType == typeof(NpgsqlDataSource)) {
+                alreadyRegistered = true;
+                break;
+            }
+        }
+
+        if (!alreadyRegistered) {
+            services.AddSingleton<NpgsqlDataSource>(dataSourceFactory);
+            services.AddSingleton<IConfigureOptions<PostgresCacheOptions>>(sp => new ConfigureOptions<PostgresCacheOptions>(opts => {
+                // Apply the user configure action first, then set the resolved data source.
+                configure(opts);
+                opts.DataSource = sp.GetRequiredService<NpgsqlDataSource>();
+            }));
+        }
+        else
+        {
+            // If a data source was already registered, just apply the user's configuration.
+            services.Configure<PostgresCacheOptions>(opts => configure(opts));
+        }
 
         return services;
     }
+
+
 
     // to enable unit testing
     internal static void AddPostgresCacheServices(IServiceCollection services) {
