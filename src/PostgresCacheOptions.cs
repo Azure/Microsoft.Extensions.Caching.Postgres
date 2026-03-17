@@ -34,6 +34,17 @@ public class PostgresCacheOptions : IOptions<PostgresCacheOptions> {
     public Action<NpgsqlDataSourceBuilder>? ConfigureDataSourceBuilder { get; set; }
 
     /// <summary>
+    /// An existing <see cref="NpgsqlDataSource"/> instance to use for database access.
+    ///
+    /// Precedence is: <see cref="ConfigureDataSourceBuilder"/>, then <see cref="DataSource"/>, then
+    /// <see cref="ConnectionString"/>.
+    ///
+    /// If both <see cref="ConfigureDataSourceBuilder"/> and <see cref="DataSource"/> are set, the builder path
+    /// is used. The data source lifetime is owned by the caller and is not disposed by the cache.
+    /// </summary>
+    public NpgsqlDataSource? DataSource { get; set; }
+
+    /// <summary>
     /// The schema name of the table.
     /// </summary>
     public string? SchemaName { get; set; }

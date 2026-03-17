@@ -34,9 +34,12 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
     public PostgresCache(IOptions<PostgresCacheOptions> options) {
         var cacheOptions = options.Value;
 
-        ArgumentThrowHelper.ThrowIfNullOrEmpty(cacheOptions.ConnectionString);
         ArgumentThrowHelper.ThrowIfNullOrEmpty(cacheOptions.SchemaName);
         ArgumentThrowHelper.ThrowIfNullOrEmpty(cacheOptions.TableName);
+
+        if (cacheOptions.ConfigureDataSourceBuilder is not null || cacheOptions.DataSource is null) {
+            ArgumentThrowHelper.ThrowIfNullOrEmpty(cacheOptions.ConnectionString);
+        }
 
         if (cacheOptions.ExpiredItemsDeletionInterval.HasValue &&
             cacheOptions.ExpiredItemsDeletionInterval.Value < MinimumExpiredItemsDeletionInterval) {
@@ -59,15 +62,21 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
         _deleteExpiredCachedItemsDelegate = DeleteExpiredCacheItems;
         _defaultSlidingExpiration = cacheOptions.DefaultSlidingExpiration;
 
-        // Build DatabaseOperations with a data source configured via the builder callback if provided
         NpgsqlDataSource dataSource;
+        bool isExternalDataSource;
         if (cacheOptions.ConfigureDataSourceBuilder is not null) {
             var builder = new NpgsqlDataSourceBuilder(cacheOptions.ConnectionString!);
             cacheOptions.ConfigureDataSourceBuilder(builder);
             dataSource = builder.Build();
+            isExternalDataSource = false;
+        }
+        else if (cacheOptions.DataSource is not null) {
+            dataSource = cacheOptions.DataSource;
+            isExternalDataSource = true;
         }
         else {
             dataSource = NpgsqlDataSource.Create(cacheOptions.ConnectionString!);
+            isExternalDataSource = false;
         }
 
         _dbOperations = new DatabaseOperations(
@@ -76,9 +85,11 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
             cacheOptions.TableName!,
             cacheOptions.UseWAL ?? false,
             cacheOptions.CreateIfNotExists ?? false,
-            _timeProvider);
+            _timeProvider,
+            isExternalDataSource);
     }
 
+    /// <inheritdoc />
     public async ValueTask DisposeAsync() {
         if (_dbOperations is IAsyncDisposable asyncDisposable) {
             await asyncDisposable.DisposeAsync().ConfigureAwait(false);
