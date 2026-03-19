@@ -177,7 +177,7 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
         ArgumentNullThrowHelper.ThrowIfNull(value);
         ArgumentNullThrowHelper.ThrowIfNull(options);
 
-        GetOptions(ref options);
+        options = EnsureExpiration(options);
 
         _dbOperations.SetCacheItem(key, new(value), options);
 
@@ -188,7 +188,7 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
         ArgumentNullThrowHelper.ThrowIfNull(key);
         ArgumentNullThrowHelper.ThrowIfNull(options);
 
-        GetOptions(ref options);
+        options = EnsureExpiration(options);
 
         _dbOperations.SetCacheItem(key, Linearize(value, out var lease), options);
         Recycle(lease); // we're fine to only recycle on success
@@ -208,11 +208,52 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
 
         token.ThrowIfCancellationRequested();
 
-        GetOptions(ref options);
+        options = EnsureExpiration(options);
 
         await _dbOperations.SetCacheItemAsync(key, new(value), options, token).ConfigureAwait(false);
 
         ScanForExpiredItemsIfRequired();
+    }
+
+    /// <summary>
+    /// Gets a cached value by key, or creates it once under a transaction-scoped Postgres advisory lock when missing.
+    /// </summary>
+    /// <param name="key">The cache key.</param>
+    /// <param name="valueFactory">Factory that creates the value if the key is missing.</param>
+    /// <param name="options">The cache entry options applied when a value is created.</param>
+    /// <param name="token">A cancellation token.</param>
+    /// <returns>The existing or newly created cache value.</returns>
+    public async Task<byte[]> GetOrCreateAsync(
+        string key,
+        Func<CancellationToken, Task<byte[]>> valueFactory,
+        DistributedCacheEntryOptions options,
+        CancellationToken token = default(CancellationToken)) {
+        ArgumentNullThrowHelper.ThrowIfNull(key);
+        ArgumentNullThrowHelper.ThrowIfNull(valueFactory);
+        ArgumentNullThrowHelper.ThrowIfNull(options);
+
+        token.ThrowIfCancellationRequested();
+
+        var existingValue = await _dbOperations.GetCacheItemAsync(key, token).ConfigureAwait(false);
+        if (existingValue is not null) {
+            ScanForExpiredItemsIfRequired();
+            return existingValue;
+        }
+
+        options = EnsureExpiration(options);
+
+        var value = await _dbOperations.GetOrCreateCacheItemWithAdvisoryLockAsync(
+            key,
+            options,
+            async cancellationToken => {
+                var producedValue = await valueFactory(cancellationToken).ConfigureAwait(false);
+                ArgumentNullThrowHelper.ThrowIfNull(producedValue);
+                return new ArraySegment<byte>(producedValue);
+            },
+            token).ConfigureAwait(false);
+
+        ScanForExpiredItemsIfRequired();
+        return value;
     }
 
     async ValueTask IBufferDistributedCache.SetAsync(
@@ -225,7 +266,7 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
 
         token.ThrowIfCancellationRequested();
 
-        GetOptions(ref options);
+        options = EnsureExpiration(options);
 
         await _dbOperations.SetCacheItemAsync(key, Linearize(value, out var lease), options, token).ConfigureAwait(false);
         Recycle(lease); // we're fine to only recycle on success
@@ -274,13 +315,15 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
         _dbOperations.DeleteExpiredCacheItems();
     }
 
-    private void GetOptions(ref DistributedCacheEntryOptions options) {
-        if (!options.AbsoluteExpiration.HasValue
-            && !options.AbsoluteExpirationRelativeToNow.HasValue
-            && !options.SlidingExpiration.HasValue) {
-            options = new DistributedCacheEntryOptions() {
-                SlidingExpiration = _defaultSlidingExpiration
-            };
+    private DistributedCacheEntryOptions EnsureExpiration(DistributedCacheEntryOptions options)
+    {
+        return options is
+        {
+            AbsoluteExpiration: null,
+            AbsoluteExpirationRelativeToNow: null,
+            SlidingExpiration: null
         }
+            ? new DistributedCacheEntryOptions { SlidingExpiration = _defaultSlidingExpiration }
+            : options;
     }
 }

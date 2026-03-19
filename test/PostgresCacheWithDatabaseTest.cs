@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Npgsql;
 using Microsoft.Extensions.Caching.Distributed;
@@ -829,6 +830,156 @@ public class PostgresCacheWithDatabaseTest
         Assert.Null(cacheItemInfo);
     }
 
+    [ConditionalFact]
+    [EnvironmentVariableSkipCondition(EnabledEnvVarName, "1")]
+    public async Task GetOrCreateAsync_CreatesAndStoresValue_WhenMissing()
+    {
+        // Arrange
+        var key = Guid.NewGuid().ToString();
+        var cache = new PostgresCache(GetCacheOptions());
+        var expectedValue = Encoding.UTF8.GetBytes("Created value");
+        var factoryCalls = 0;
+
+        // Act
+        var value = await cache.GetOrCreateAsync(
+            key,
+            _ =>
+            {
+                factoryCalls++;
+                return Task.FromResult(expectedValue);
+            },
+            new DistributedCacheEntryOptions().SetAbsoluteExpiration(relative: TimeSpan.FromMinutes(1)));
+
+        // Assert
+        Assert.Equal(expectedValue, value);
+        Assert.Equal(1, factoryCalls);
+
+        var cacheItem = await GetCacheItemFromDatabaseAsync(key);
+        Assert.NotNull(cacheItem);
+        Assert.Equal(expectedValue, cacheItem.Value);
+    }
+
+    [ConditionalFact]
+    [EnvironmentVariableSkipCondition(EnabledEnvVarName, "1")]
+    public async Task GetOrCreateAsync_ReturnsExistingValue_WithoutInvokingFactory()
+    {
+        // Arrange
+        var key = Guid.NewGuid().ToString();
+        var cache = new PostgresCache(GetCacheOptions());
+        var existingValue = Encoding.UTF8.GetBytes("Existing value");
+        await cache.SetAsync(
+            key,
+            existingValue,
+            new DistributedCacheEntryOptions().SetAbsoluteExpiration(relative: TimeSpan.FromMinutes(1)));
+
+        // Act
+        var value = await cache.GetOrCreateAsync(
+            key,
+            _ => throw new InvalidOperationException("Factory should not run when value already exists."),
+            new DistributedCacheEntryOptions().SetAbsoluteExpiration(relative: TimeSpan.FromMinutes(1)));
+
+        // Assert
+        Assert.Equal(existingValue, value);
+    }
+
+    [ConditionalFact]
+    [EnvironmentVariableSkipCondition(EnabledEnvVarName, "1")]
+    public async Task GetOrCreateAsync_ConcurrentCalls_InvokeFactoryOncePerKey()
+    {
+        // Arrange
+        var key = Guid.NewGuid().ToString();
+        var cache = new PostgresCache(GetCacheOptions());
+        var expectedValue = Encoding.UTF8.GetBytes("Concurrent value");
+        var factoryCalls = 0;
+
+        async Task<byte[]> Factory(CancellationToken token)
+        {
+            Interlocked.Increment(ref factoryCalls);
+            await Task.Delay(TimeSpan.FromMilliseconds(100), token);
+            return expectedValue;
+        }
+
+        var tasks = new List<Task<byte[]>>();
+        for (var i = 0; i < 6; i++)
+        {
+            tasks.Add(cache.GetOrCreateAsync(
+                key,
+                Factory,
+                new DistributedCacheEntryOptions().SetAbsoluteExpiration(relative: TimeSpan.FromMinutes(1))));
+        }
+
+        // Act
+        var results = await Task.WhenAll(tasks);
+
+        // Assert
+        Assert.Equal(1, factoryCalls);
+        foreach (var result in results)
+        {
+            Assert.Equal(expectedValue, result);
+        }
+    }
+
+    [ConditionalFact]
+    [EnvironmentVariableSkipCondition(EnabledEnvVarName, "1")]
+    public async Task GetOrCreateCacheItemWithAdvisoryLockAsync_CreatesValue_WhenMissing()
+    {
+        // Arrange
+        var key = Guid.NewGuid().ToString();
+        var testClock = new FakeTimeProvider();
+        var expectedValue = Encoding.UTF8.GetBytes("Created directly by db operations");
+        await using var dbOperations = CreateDatabaseOperations(testClock);
+
+        // Act
+        var value = await dbOperations.GetOrCreateCacheItemWithAdvisoryLockAsync(
+            key,
+            new DistributedCacheEntryOptions().SetAbsoluteExpiration(relative: TimeSpan.FromMinutes(1)),
+            _ => Task.FromResult(new ArraySegment<byte>(expectedValue)));
+
+        // Assert
+        Assert.Equal(expectedValue, value);
+        var cacheItem = await GetCacheItemFromDatabaseAsync(key);
+        Assert.NotNull(cacheItem);
+        Assert.Equal(expectedValue, cacheItem.Value);
+    }
+
+    [ConditionalFact]
+    [EnvironmentVariableSkipCondition(EnabledEnvVarName, "1")]
+    public async Task GetOrCreateCacheItemWithAdvisoryLockAsync_ConcurrentCalls_InvokeFactoryOnce()
+    {
+        // Arrange
+        var key = Guid.NewGuid().ToString();
+        var testClock = new FakeTimeProvider();
+        await using var dbOperations = CreateDatabaseOperations(testClock);
+        var expectedValue = Encoding.UTF8.GetBytes("Concurrent direct db operations");
+        var factoryCalls = 0;
+
+        async Task<ArraySegment<byte>> Factory(CancellationToken token)
+        {
+            Interlocked.Increment(ref factoryCalls);
+            await Task.Delay(TimeSpan.FromMilliseconds(100), token);
+            return new ArraySegment<byte>(expectedValue);
+        }
+
+        var tasks = new List<Task<byte[]>>();
+        for (var i = 0; i < 6; i++)
+        {
+            tasks.Add(dbOperations.GetOrCreateCacheItemWithAdvisoryLockAsync(
+                key,
+                new DistributedCacheEntryOptions().SetAbsoluteExpiration(relative: TimeSpan.FromMinutes(1)),
+                Factory));
+        }
+
+        // Act
+        var results = await Task.WhenAll(tasks);
+
+        // Assert
+        Assert.Equal(1, factoryCalls);
+        foreach (var result in results)
+        {
+            Assert.Equal(expectedValue, result);
+        }
+    }
+
     private IDistributedCache GetPostgresCache(PostgresCacheOptions options = null)
     {
         if (options == null)
@@ -837,6 +988,17 @@ public class PostgresCacheWithDatabaseTest
         }
 
         return new PostgresCache(options);
+    }
+
+    private DatabaseOperations CreateDatabaseOperations(TimeProvider timeProvider = null)
+    {
+        return new DatabaseOperations(
+            NpgsqlDataSource.Create(_connectionString),
+            _schemaName,
+            _tableName,
+            _useWAL,
+            _createIfNotExists,
+            timeProvider ?? new FakeTimeProvider());
     }
 
     private PostgresCacheOptions GetCacheOptions(TimeProvider testClock = null)
@@ -876,7 +1038,7 @@ public class PostgresCacheWithDatabaseTest
         {
             var command = new NpgsqlCommand(
                 $"SELECT Id, Value, ExpiresAtTime, SlidingExpirationInSeconds, AbsoluteExpiration " +
-                $"FROM {_tableName} WHERE Id = @Id",
+                $"FROM {_schemaName}.{_tableName} WHERE Id = @Id",
                 connection);
             command.Parameters.AddWithValue("Id", key);
 
