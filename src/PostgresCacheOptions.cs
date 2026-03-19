@@ -36,10 +36,10 @@ public class PostgresCacheOptions : IOptions<PostgresCacheOptions> {
     /// <summary>
     /// An existing <see cref="NpgsqlDataSource"/> instance to use for database access.
     ///
-    /// Precedence is: <see cref="ConfigureDataSourceBuilder"/>, then <see cref="DataSource"/>, then
+    /// Precedence is: <see cref="DataSource"/>, then <see cref="ConfigureDataSourceBuilder"/>, then
     /// <see cref="ConnectionString"/>.
     ///
-    /// If both <see cref="ConfigureDataSourceBuilder"/> and <see cref="DataSource"/> are set, the builder path
+    /// If both <see cref="DataSource"/> and <see cref="ConfigureDataSourceBuilder"/> are set, <see cref="DataSource"/>
     /// is used. The data source lifetime is owned by the caller and is not disposed by the cache.
     /// </summary>
     public NpgsqlDataSource? DataSource { get; set; }

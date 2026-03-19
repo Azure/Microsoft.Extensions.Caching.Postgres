@@ -68,7 +68,11 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
         NpgsqlDataSource dataSource;
         bool isExternalDataSource;
       
-        if (cacheOptions.ConfigureDataSourceBuilder is not null) {
+        if (cacheOptions.DataSource is not null) {
+            dataSource = cacheOptions.DataSource;
+            isExternalDataSource = true;
+        }
+        else if (cacheOptions.ConfigureDataSourceBuilder is not null) {
             var builder = new NpgsqlDataSourceBuilder(cacheOptions.ConnectionString!);
           
             // if disabled or misconfigured
@@ -83,10 +87,6 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
             cacheOptions.ConfigureDataSourceBuilder?.Invoke(builder);
             dataSource = builder.Build();
             isExternalDataSource = false;            
-        }
-        else if (cacheOptions.DataSource is not null) {
-            dataSource = cacheOptions.DataSource;
-            isExternalDataSource = true;
         }
         else {
             dataSource = NpgsqlDataSource.Create(cacheOptions.ConnectionString!);

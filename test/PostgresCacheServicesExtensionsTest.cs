@@ -113,6 +113,36 @@ public class PostgresCacheServicesExtensionsTest
     }
 
     [Fact]
+    public void AddDistributedPostgresCache_WithDataSourceAndConfigureDataSourceBuilder_PrioritizesSource()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var dataSource = NpgsqlDataSource.Create("Host=Fake;Username=Fake;Password=Fake;Database=Fake;");
+
+        var builderCallbackInvoked = false;
+
+        services.AddDistributedPostgresCache(options =>
+        {
+            options.DataSource = dataSource;
+            options.SchemaName = "Fake";
+            options.TableName = "Fake";
+            options.ConfigureDataSourceBuilder = _ =>
+            {
+                builderCallbackInvoked = true;
+                throw new InvalidOperationException("Builder callback should not be used when DataSource is provided.");
+            };
+        });
+
+        // Act
+        var serviceProvider = services.BuildServiceProvider();
+        var cache = serviceProvider.GetRequiredService<IDistributedCache>();
+
+        // Assert
+        Assert.IsType<PostgresCache>(cache);
+        Assert.False(builderCallbackInvoked);
+    }
+
+    [Fact]
     public void AddDistributedPostgresCache_WithDataSourceInstanceOverload_ResolvesCacheWithoutConnectionString()
     {
         // Arrange
