@@ -3,7 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-
+using Npgsql;
 using Postgres.EntraAuth;
 
 using System.Diagnostics;
@@ -21,15 +21,20 @@ var host = Host.CreateDefaultBuilder(args)
 
             options.ConnectionString = context.Configuration.GetConnectionString("PostgresCache");
 
-            // Example: periodically supply a password/token for auth (e.g., Entra access token) Uncomment following line to use Entra authentication:
-            //options.ConfigureDataSourceBuilder = builder => { builder.UseEntraAuthentication(); };
+            //use an existing data source if you have one, otherwise the cache will create its own using the connection string or builder callback
+            //options.DataSource = NpgsqlDataSource.Create(options.ConnectionString);
 
             options.SchemaName = context.Configuration.GetValue<string>("PostgresCache:SchemaName", "public");
             options.TableName = context.Configuration.GetValue<string>("PostgresCache:TableName", "__cache");
             options.CreateIfNotExists = context.Configuration.GetValue<bool>("PostgresCache:CreateIfNotExists", true);
-            options.UseWAL = context.Configuration.GetValue<bool>("PostgresCache:UseWAL", false);
+            options.UseWAL = context.Configuration.GetValue<bool>("PostgresCache:UseWAL", false);            
 
-        });
+        }
+        // configure the data source builder for advanced scenarios (e.g., Entra authentication)
+        // builder will be used if options.DataSource is not set.
+        //, builder => { builder.UseEntraAuthentication(); }
+        
+        );
 
         services.AddHybridCache();
 

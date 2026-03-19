@@ -40,7 +40,7 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
         ArgumentThrowHelper.ThrowIfNullOrEmpty(cacheOptions.SchemaName);
         ArgumentThrowHelper.ThrowIfNullOrEmpty(cacheOptions.TableName);
 
-        if (cacheOptions.ConfigureDataSourceBuilder is not null || cacheOptions.DataSource is null) {
+        if (cacheOptions.DataSource is null) {
             ArgumentThrowHelper.ThrowIfNullOrEmpty(cacheOptions.ConnectionString);
         }
 

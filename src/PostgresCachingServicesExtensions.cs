@@ -47,7 +47,10 @@ public static class PostgresCachingServicesExtensions {
         AddPostgresCacheServices(services);
         services.Configure<PostgresCacheOptions>(opts => {
             configure(opts);
-            opts.ConfigureDataSourceBuilder = configureDataSourceBuilder;
+            if (opts.DataSource is null) {
+                opts.ConfigureDataSourceBuilder = configureDataSourceBuilder;
+            }
+            
         });
 
         return services;
