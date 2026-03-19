@@ -65,8 +65,15 @@ internal sealed class DatabaseOperations : IDatabaseOperations, IAsyncDisposable
     private NpgsqlConnection InitializeConnection() {
         var conn = ds.CreateConnection();
 
+        // If the DDL has already been executed, or if we're not supposed to create the schema/table/index if they don't exist, then just return the connection.
+        // Otherwise, we need to acquire a lock and check again if the DDL has been executed
+        if (ddlExecuted || !CreateIfNotExists) {
+            return conn;
+        }
+
         lock (ddlLock) {
 
+            // if the DDL has not been executed AND we are supposed to create the schema/table/index...
             if (!ddlExecuted && CreateIfNotExists) {
                 var sql = string.Join(";", SqlQueries.CreateSchema, SqlQueries.CreateTable, SqlQueries.CreateIndex);
                 conn.Open();

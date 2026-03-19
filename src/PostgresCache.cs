@@ -19,13 +19,16 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
     private static readonly TimeSpan MinimumExpiredItemsDeletionInterval = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan DefaultExpiredItemsDeletionInterval = TimeSpan.FromMinutes(30);
 
+    private static readonly int AUTO_PREPARE_MIN_USAGE = 2;
+    private static readonly int AUTO_PREPARE_MAX_USAGE = 32;
+
     private readonly IDatabaseOperations _dbOperations;
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _expiredItemsDeletionInterval;
-    private DateTimeOffset _lastExpirationScan;
+    private long _lastExpirationScan;
+    private int _expirationScanRunning;
     private readonly Action _deleteExpiredCachedItemsDelegate;
     private readonly TimeSpan _defaultSlidingExpiration;
-    private readonly Object _mutex = new Object();
 
     /// <summary>
     /// Initializes a new instance of <see cref="PostgresCache"/>.
@@ -64,11 +67,22 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
 
         NpgsqlDataSource dataSource;
         bool isExternalDataSource;
+      
         if (cacheOptions.ConfigureDataSourceBuilder is not null) {
             var builder = new NpgsqlDataSourceBuilder(cacheOptions.ConnectionString!);
-            cacheOptions.ConfigureDataSourceBuilder(builder);
+          
+            // if disabled or misconfigured
+            // default to min usages before auto-prepare and max auto-prepared statements
+            //  should be sufficient for most workloads while keeping memory usage in check
+            if (builder.ConnectionStringBuilder.AutoPrepareMinUsages <= 0) {
+                builder.ConnectionStringBuilder.AutoPrepareMinUsages = AUTO_PREPARE_MIN_USAGE;
+            }
+            if (builder.ConnectionStringBuilder.MaxAutoPrepare <= 0) {
+                builder.ConnectionStringBuilder.MaxAutoPrepare = AUTO_PREPARE_MAX_USAGE;
+            }
+            cacheOptions.ConfigureDataSourceBuilder?.Invoke(builder);
             dataSource = builder.Build();
-            isExternalDataSource = false;
+            isExternalDataSource = false;            
         }
         else if (cacheOptions.DataSource is not null) {
             dataSource = cacheOptions.DataSource;
@@ -313,13 +327,25 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
     // Called by multiple actions to see how long it's been since we last checked for expired items.
     // If sufficient time has elapsed then a scan is initiated on a background task.
     private void ScanForExpiredItemsIfRequired() {
-        lock (_mutex) {
-            var utcNow = _timeProvider.GetUtcNow();
-            if ((utcNow - _lastExpirationScan) > _expiredItemsDeletionInterval) {
-                _lastExpirationScan = utcNow;
-                Task.Run(_deleteExpiredCachedItemsDelegate);
-            }
+        var _now = _timeProvider.GetUtcNow().Ticks;
+        var _last = Volatile.Read(ref _lastExpirationScan);
+
+        if ((_now - _last) <= _expiredItemsDeletionInterval.Ticks) {
+            return;
         }
+
+        if (Interlocked.CompareExchange(ref _lastExpirationScan, _now, _last) != _last) {
+            return;
+        }
+
+        if (Interlocked.Exchange(ref _expirationScanRunning, 1) == 1) {
+            return;
+        }
+
+        _ = Task.Run(() => {
+            try { _deleteExpiredCachedItemsDelegate(); }
+            finally { Volatile.Write(ref _expirationScanRunning, 0); }
+        });
     }
 
     private void DeleteExpiredCacheItems() {

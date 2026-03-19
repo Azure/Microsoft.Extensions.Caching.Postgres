@@ -1,6 +1,0 @@
-{
-  "ConnectionString": "Host=postgres;Username=postgres;Password=postgres;Database=postgres;Pooling=true;MinPoolSize=0;MaxPoolSize=100;Timeout=15;",
-  "SchemaName": "public",
-  "TableName": "CacheTest",
-  "CreateIfNotExists": "true"
-}
