@@ -18,21 +18,21 @@
 
 	<!-- Microsoft.Extensions packages (all frameworks use 10.x to match main project) -->
 	<ItemGroup>
-		<PackageReference Include="Microsoft.Bcl.TimeProvider" Version="10.0.1" />
-		<PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.1" PrivateAssets="All" />
-		<PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.1" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.1" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.1" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.1" />
-		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.1" />
-		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.1" />
-		<PackageReference Include="Microsoft.Extensions.Options" Version="10.0.1" PrivateAssets="All" />
+		<PackageReference Include="Microsoft.Bcl.TimeProvider" Version="10.0.5" />
+		<PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.5" PrivateAssets="All" />
+		<PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.5" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.5" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.5" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.5" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.5" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
+		<PackageReference Include="Microsoft.Extensions.Options" Version="10.0.5" PrivateAssets="All" />
 		<PackageReference Include="Moq" Version="4.20.72" />		
 	</ItemGroup>
 
 	<!-- Test framework -->
 	<ItemGroup>
-		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
+		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
 		<PackageReference Include="xunit" Version="2.9.3" />
 		<PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
 		  <PrivateAssets>all</PrivateAssets>
@@ -46,7 +46,7 @@
 
 	<!-- Npgsql: net10.0 -->
 	<ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
-		<PackageReference Include="Npgsql" Version="10.0.1" />
+		<PackageReference Include="Npgsql" Version="10.0.2" />
 	</ItemGroup>
 
 	<!-- Npgsql: net8.0, net9.0 -->
