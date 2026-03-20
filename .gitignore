@@ -400,3 +400,4 @@ FodyWeavers.xsd
 *.sln.iml
 /sample/sample.Console/appsettings.json
 /sample/sample.AppHost/Properties/launchSettings.json
+/test/config.json

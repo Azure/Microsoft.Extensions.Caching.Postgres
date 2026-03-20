@@ -19,13 +19,16 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
     private static readonly TimeSpan MinimumExpiredItemsDeletionInterval = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan DefaultExpiredItemsDeletionInterval = TimeSpan.FromMinutes(30);
 
+    private static readonly int AUTO_PREPARE_MIN_USAGE = 2;
+    private static readonly int AUTO_PREPARE_MAX_USAGE = 32;
+
     private readonly IDatabaseOperations _dbOperations;
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _expiredItemsDeletionInterval;
-    private DateTimeOffset _lastExpirationScan;
+    private long _lastExpirationScan;
+    private int _expirationScanRunning;
     private readonly Action _deleteExpiredCachedItemsDelegate;
     private readonly TimeSpan _defaultSlidingExpiration;
-    private readonly Object _mutex = new Object();
 
     /// <summary>
     /// Initializes a new instance of <see cref="PostgresCache"/>.
@@ -34,9 +37,12 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
     public PostgresCache(IOptions<PostgresCacheOptions> options) {
         var cacheOptions = options.Value;
 
-        ArgumentThrowHelper.ThrowIfNullOrEmpty(cacheOptions.ConnectionString);
         ArgumentThrowHelper.ThrowIfNullOrEmpty(cacheOptions.SchemaName);
         ArgumentThrowHelper.ThrowIfNullOrEmpty(cacheOptions.TableName);
+
+        if (cacheOptions.DataSource is null) {
+            ArgumentThrowHelper.ThrowIfNullOrEmpty(cacheOptions.ConnectionString);
+        }
 
         if (cacheOptions.ExpiredItemsDeletionInterval.HasValue &&
             cacheOptions.ExpiredItemsDeletionInterval.Value < MinimumExpiredItemsDeletionInterval) {
@@ -59,15 +65,32 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
         _deleteExpiredCachedItemsDelegate = DeleteExpiredCacheItems;
         _defaultSlidingExpiration = cacheOptions.DefaultSlidingExpiration;
 
-        // Build DatabaseOperations with a data source configured via the builder callback if provided
         NpgsqlDataSource dataSource;
-        if (cacheOptions.ConfigureDataSourceBuilder is not null) {
+        bool isExternalDataSource;
+      
+        if (cacheOptions.DataSource is not null) {
+            dataSource = cacheOptions.DataSource;
+            isExternalDataSource = true;
+        }
+        else if (cacheOptions.ConfigureDataSourceBuilder is not null) {
             var builder = new NpgsqlDataSourceBuilder(cacheOptions.ConnectionString!);
-            cacheOptions.ConfigureDataSourceBuilder(builder);
+          
+            // if disabled or misconfigured
+            // default to min usages before auto-prepare and max auto-prepared statements
+            //  should be sufficient for most workloads while keeping memory usage in check
+            if (builder.ConnectionStringBuilder.AutoPrepareMinUsages <= 0) {
+                builder.ConnectionStringBuilder.AutoPrepareMinUsages = AUTO_PREPARE_MIN_USAGE;
+            }
+            if (builder.ConnectionStringBuilder.MaxAutoPrepare <= 0) {
+                builder.ConnectionStringBuilder.MaxAutoPrepare = AUTO_PREPARE_MAX_USAGE;
+            }
+            cacheOptions.ConfigureDataSourceBuilder?.Invoke(builder);
             dataSource = builder.Build();
+            isExternalDataSource = false;            
         }
         else {
             dataSource = NpgsqlDataSource.Create(cacheOptions.ConnectionString!);
+            isExternalDataSource = false;
         }
 
         _dbOperations = new DatabaseOperations(
@@ -76,9 +99,11 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
             cacheOptions.TableName!,
             cacheOptions.UseWAL ?? false,
             cacheOptions.CreateIfNotExists ?? false,
-            _timeProvider);
+            _timeProvider,
+            isExternalDataSource);
     }
 
+    /// <inheritdoc />
     public async ValueTask DisposeAsync() {
         if (_dbOperations is IAsyncDisposable asyncDisposable) {
             await asyncDisposable.DisposeAsync().ConfigureAwait(false);
@@ -177,7 +202,7 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
         ArgumentNullThrowHelper.ThrowIfNull(value);
         ArgumentNullThrowHelper.ThrowIfNull(options);
 
-        GetOptions(ref options);
+        options = EnsureExpiration(options);
 
         _dbOperations.SetCacheItem(key, new(value), options);
 
@@ -188,7 +213,7 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
         ArgumentNullThrowHelper.ThrowIfNull(key);
         ArgumentNullThrowHelper.ThrowIfNull(options);
 
-        GetOptions(ref options);
+        options = EnsureExpiration(options);
 
         _dbOperations.SetCacheItem(key, Linearize(value, out var lease), options);
         Recycle(lease); // we're fine to only recycle on success
@@ -208,11 +233,52 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
 
         token.ThrowIfCancellationRequested();
 
-        GetOptions(ref options);
+        options = EnsureExpiration(options);
 
         await _dbOperations.SetCacheItemAsync(key, new(value), options, token).ConfigureAwait(false);
 
         ScanForExpiredItemsIfRequired();
+    }
+
+    /// <summary>
+    /// Gets a cached value by key, or creates it once under a transaction-scoped Postgres advisory lock when missing.
+    /// </summary>
+    /// <param name="key">The cache key.</param>
+    /// <param name="valueFactory">Factory that creates the value if the key is missing.</param>
+    /// <param name="options">The cache entry options applied when a value is created.</param>
+    /// <param name="token">A cancellation token.</param>
+    /// <returns>The existing or newly created cache value.</returns>
+    public async Task<byte[]> GetOrCreateAsync(
+        string key,
+        Func<CancellationToken, Task<byte[]>> valueFactory,
+        DistributedCacheEntryOptions options,
+        CancellationToken token = default(CancellationToken)) {
+        ArgumentNullThrowHelper.ThrowIfNull(key);
+        ArgumentNullThrowHelper.ThrowIfNull(valueFactory);
+        ArgumentNullThrowHelper.ThrowIfNull(options);
+
+        token.ThrowIfCancellationRequested();
+
+        var existingValue = await _dbOperations.GetCacheItemAsync(key, token).ConfigureAwait(false);
+        if (existingValue is not null) {
+            ScanForExpiredItemsIfRequired();
+            return existingValue;
+        }
+
+        options = EnsureExpiration(options);
+
+        var value = await _dbOperations.GetOrCreateCacheItemWithAdvisoryLockAsync(
+            key,
+            options,
+            async cancellationToken => {
+                var producedValue = await valueFactory(cancellationToken).ConfigureAwait(false);
+                ArgumentNullThrowHelper.ThrowIfNull(producedValue);
+                return new ArraySegment<byte>(producedValue);
+            },
+            token).ConfigureAwait(false);
+
+        ScanForExpiredItemsIfRequired();
+        return value;
     }
 
     async ValueTask IBufferDistributedCache.SetAsync(
@@ -225,7 +291,7 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
 
         token.ThrowIfCancellationRequested();
 
-        GetOptions(ref options);
+        options = EnsureExpiration(options);
 
         await _dbOperations.SetCacheItemAsync(key, Linearize(value, out var lease), options, token).ConfigureAwait(false);
         Recycle(lease); // we're fine to only recycle on success
@@ -261,26 +327,40 @@ public class PostgresCache : IDistributedCache, IBufferDistributedCache, IAsyncD
     // Called by multiple actions to see how long it's been since we last checked for expired items.
     // If sufficient time has elapsed then a scan is initiated on a background task.
     private void ScanForExpiredItemsIfRequired() {
-        lock (_mutex) {
-            var utcNow = _timeProvider.GetUtcNow();
-            if ((utcNow - _lastExpirationScan) > _expiredItemsDeletionInterval) {
-                _lastExpirationScan = utcNow;
-                Task.Run(_deleteExpiredCachedItemsDelegate);
-            }
+        var _now = _timeProvider.GetUtcNow().Ticks;
+        var _last = Volatile.Read(ref _lastExpirationScan);
+
+        if ((_now - _last) <= _expiredItemsDeletionInterval.Ticks) {
+            return;
         }
+
+        if (Interlocked.CompareExchange(ref _lastExpirationScan, _now, _last) != _last) {
+            return;
+        }
+
+        if (Interlocked.Exchange(ref _expirationScanRunning, 1) == 1) {
+            return;
+        }
+
+        _ = Task.Run(() => {
+            try { _deleteExpiredCachedItemsDelegate(); }
+            finally { Volatile.Write(ref _expirationScanRunning, 0); }
+        });
     }
 
     private void DeleteExpiredCacheItems() {
         _dbOperations.DeleteExpiredCacheItems();
     }
 
-    private void GetOptions(ref DistributedCacheEntryOptions options) {
-        if (!options.AbsoluteExpiration.HasValue
-            && !options.AbsoluteExpirationRelativeToNow.HasValue
-            && !options.SlidingExpiration.HasValue) {
-            options = new DistributedCacheEntryOptions() {
-                SlidingExpiration = _defaultSlidingExpiration
-            };
+    private DistributedCacheEntryOptions EnsureExpiration(DistributedCacheEntryOptions options)
+    {
+        return options is
+        {
+            AbsoluteExpiration: null,
+            AbsoluteExpirationRelativeToNow: null,
+            SlidingExpiration: null
         }
+            ? new DistributedCacheEntryOptions { SlidingExpiration = _defaultSlidingExpiration }
+            : options;
     }
 }

@@ -4,35 +4,48 @@
 using System;
 using System.Buffers;
 using System.Data;
+using System.Data.Common;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Npgsql;
+using System.Transactions;
 using Microsoft.Extensions.Caching.Distributed;
+using Npgsql;
 using NpgsqlTypes;
 
 namespace Microsoft.Extensions.Caching.Postgres;
 
 internal sealed class DatabaseOperations : IDatabaseOperations, IAsyncDisposable {
-    /// <summary>
-    /// Postgres Duplicate Key Error Id
-    /// </summary>
-    private const int DuplicateKeyErrorId = 23505;
-
     private const string UtcNowParameterName = "@utcNow";
 
     private volatile bool ddlExecuted;
     private readonly object ddlLock = new object();
 
     private readonly NpgsqlDataSource ds;
+    private readonly bool isExternalDataSource;
 
-    public DatabaseOperations(NpgsqlDataSource dataSource, string schemaName, string tableName, bool useWAL, bool createIfNotExists, TimeProvider timeProvider) {
+    private static byte[] CopyArraySegment(ArraySegment<byte> value) {
+        if (value.Array is null || value.Count == 0) {
+            return [];
+        }
+
+        if (value.Offset == 0 && value.Count == value.Array.Length) {
+            return value.Array;
+        }
+
+        var copied = new byte[value.Count];
+        Buffer.BlockCopy(value.Array, value.Offset, copied, 0, value.Count);
+        return copied;
+    }
+  
+    public DatabaseOperations(NpgsqlDataSource dataSource, string schemaName, string tableName, bool useWAL, bool createIfNotExists, TimeProvider timeProvider, bool isExternalDataSource = false) {
         ds = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
         SchemaName = schemaName;
         TableName = tableName;
         UseWAL = useWAL;
         CreateIfNotExists = createIfNotExists;
         TimeProvider = timeProvider;
+        this.isExternalDataSource = isExternalDataSource;
         SqlQueries = new SqlQueries(schemaName, tableName, useWAL);
     }
 
@@ -52,8 +65,15 @@ internal sealed class DatabaseOperations : IDatabaseOperations, IAsyncDisposable
     private NpgsqlConnection InitializeConnection() {
         var conn = ds.CreateConnection();
 
+        // If the DDL has already been executed, or if we're not supposed to create the schema/table/index if they don't exist, then just return the connection.
+        // Otherwise, we need to acquire a lock and check again if the DDL has been executed
+        if (ddlExecuted || !CreateIfNotExists) {
+            return conn;
+        }
+
         lock (ddlLock) {
 
+            // if the DDL has not been executed AND we are supposed to create the schema/table/index...
             if (!ddlExecuted && CreateIfNotExists) {
                 var sql = string.Join(";", SqlQueries.CreateSchema, SqlQueries.CreateTable, SqlQueries.CreateIndex);
                 conn.Open();
@@ -150,19 +170,7 @@ internal sealed class DatabaseOperations : IDatabaseOperations, IAsyncDisposable
                 .AddWithValue(UtcNowParameterName, NpgsqlDbType.TimestampTz, utcNow);
 
             connection.Open();
-
-            try {
-                upsertCommand.ExecuteNonQuery();
-            }
-            catch (NpgsqlException ex) {
-                if (DatabaseOperations.IsDuplicateKeyException(ex)) {
-                    // There is a possibility that multiple requests can try to add the same item to the cache, in
-                    // which case we receive a 'duplicate key' exception on the primary key column.
-                }
-                else {
-                    throw;
-                }
-            }
+            upsertCommand.ExecuteNonQuery();
         }
     }
 
@@ -184,19 +192,7 @@ internal sealed class DatabaseOperations : IDatabaseOperations, IAsyncDisposable
                 .AddWithValue(UtcNowParameterName, NpgsqlDbType.TimestampTz, utcNow);
 
             await connection.OpenAsync(token).ConfigureAwait(false);
-
-            try {
-                await upsertCommand.ExecuteNonQueryAsync(token).ConfigureAwait(false);
-            }
-            catch (NpgsqlException ex) {
-                if (DatabaseOperations.IsDuplicateKeyException(ex)) {
-                    // There is a possibility that multiple requests can try to add the same item to the cache, in
-                    // which case we receive a 'duplicate key' exception on the primary key column.
-                }
-                else {
-                    throw;
-                }
-            }
+            await upsertCommand.ExecuteNonQueryAsync(token).ConfigureAwait(false);
         }
     }
 
@@ -286,6 +282,85 @@ internal sealed class DatabaseOperations : IDatabaseOperations, IAsyncDisposable
         return value;
     }
 
+    private async Task<byte[]?> GetCacheItemAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string key, CancellationToken token) {
+        token.ThrowIfCancellationRequested();
+
+        var utcNow = TimeProvider.GetUtcNow();
+        byte[]? value = null;
+
+        using (var command = new NpgsqlCommand(SqlQueries.GetCacheItem, connection, transaction)) {
+            command.Parameters
+                .AddCacheItemId(key)
+                .AddWithValue(UtcNowParameterName, NpgsqlDbType.TimestampTz, utcNow);
+
+            using var reader = await command.ExecuteReaderAsync(
+                CommandBehavior.SequentialAccess | CommandBehavior.SingleRow | CommandBehavior.SingleResult, token).ConfigureAwait(false);
+
+            if (await reader.ReadAsync(token).ConfigureAwait(false)) {
+                value = await reader.GetFieldValueAsync<byte[]>(Columns.Indexes.CacheItemValueIndex, token).ConfigureAwait(false);
+            }
+        }
+
+        return value;
+    }
+
+    public async Task<byte[]> GetOrCreateCacheItemWithAdvisoryLockAsync(
+        string key,
+        DistributedCacheEntryOptions options,
+        Func<CancellationToken, Task<ArraySegment<byte>>> valueFactory,
+        CancellationToken token = default(CancellationToken)) {
+        token.ThrowIfCancellationRequested();
+
+        var utcNow = TimeProvider.GetUtcNow();
+
+        var absoluteExpiration = DatabaseOperations.GetAbsoluteExpiration(utcNow, options);
+        DatabaseOperations.ValidateOptions(options.SlidingExpiration, absoluteExpiration);
+
+        using (var connection = InitializeConnection()) {
+            await connection.OpenAsync(token).ConfigureAwait(false);
+
+            using var transaction = connection.BeginTransaction();
+            try {
+                using (var lockCommand = new NpgsqlCommand(SqlQueries.AcquireAdvisoryTransactionLock, connection, transaction)) {
+                    lockCommand.Parameters.AddCacheItemId(key);
+                    await lockCommand.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+                }
+
+                var existingValue = await GetCacheItemAsync(connection, transaction, key, token).ConfigureAwait(false);
+                if (existingValue is not null) {
+                    transaction.Commit();
+                    return existingValue;
+                }
+
+                var createdValue = await valueFactory(token).ConfigureAwait(false);
+
+                using (var upsertCommand = new NpgsqlCommand(SqlQueries.SetCacheItem, connection, transaction)) {
+                    upsertCommand.Parameters
+                    .AddCacheItemId(key)
+                    .AddCacheItemValue(createdValue)
+                    .AddSlidingExpirationInSeconds(options.SlidingExpiration)
+                    .AddAbsoluteExpiration(absoluteExpiration)
+                    .AddWithValue(UtcNowParameterName, NpgsqlDbType.TimestampTz, utcNow);
+
+                    await upsertCommand.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+                }
+
+                transaction.Commit();
+                return CopyArraySegment(createdValue);
+            }
+            catch {
+                try {
+                    transaction.Rollback();
+                }
+                catch {
+                    // Best effort rollback. Original exception is more actionable.
+                }
+
+                throw;
+            }
+        }
+    }
+
     private static long StreamOut(NpgsqlDataReader source, int ordinal, IBufferWriter<byte> destination) {
         long dataIndex = 0;
         int read = 0;
@@ -326,13 +401,6 @@ internal sealed class DatabaseOperations : IDatabaseOperations, IAsyncDisposable
         return dataIndex;
     }
 
-    private static bool IsDuplicateKeyException(NpgsqlException ex) {
-        if (ex != null) {
-            return ex.ErrorCode.Equals(DuplicateKeyErrorId);
-        }
-        return false;
-    }
-
     private static DateTimeOffset? GetAbsoluteExpiration(DateTimeOffset utcNow, DistributedCacheEntryOptions options) {
         // calculate absolute expiration
         DateTimeOffset? absoluteExpiration = null;
@@ -356,6 +424,6 @@ internal sealed class DatabaseOperations : IDatabaseOperations, IAsyncDisposable
     }
 
     public ValueTask DisposeAsync() {
-        return ds.DisposeAsync();
+        return isExternalDataSource ? default : ds.DisposeAsync();
     }
 }

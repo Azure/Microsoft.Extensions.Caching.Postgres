@@ -101,7 +101,6 @@ internal static class NpgsqlParameterCollectionExtensions
         var parameter = new NpgsqlParameter(parameterName, dbType);
         parameter.Value = value;
         parameters.Add(parameter);
-        parameter.ResetDbType();
         return parameters;
     }
 
@@ -115,7 +114,6 @@ internal static class NpgsqlParameterCollectionExtensions
         var parameter = new NpgsqlParameter(parameterName, dbType, size);
         parameter.Value = value;
         parameters.Add(parameter);
-        parameter.ResetDbType();
         return parameters;
     }
 

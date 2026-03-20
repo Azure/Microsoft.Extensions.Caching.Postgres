@@ -31,5 +31,11 @@ internal interface IDatabaseOperations
 
     Task SetCacheItemAsync(string key, ArraySegment<byte> value, DistributedCacheEntryOptions options, CancellationToken token = default(CancellationToken));
 
+    Task<byte[]> GetOrCreateCacheItemWithAdvisoryLockAsync(
+        string key,
+        DistributedCacheEntryOptions options,
+        Func<CancellationToken, Task<ArraySegment<byte>>> valueFactory,
+        CancellationToken token = default(CancellationToken));
+
     void DeleteExpiredCacheItems();
 }

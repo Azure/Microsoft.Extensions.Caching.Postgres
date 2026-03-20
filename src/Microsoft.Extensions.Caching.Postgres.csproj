@@ -9,7 +9,7 @@
 		<LangVersion>13.0</LangVersion>
 		<Nullable>enable</Nullable>
 		<NeutralLanguage>en-US</NeutralLanguage>
-		<ClientVersion>1.2.1</ClientVersion>
+		<ClientVersion>1.2.2</ClientVersion>
 		<IsPreview>false</IsPreview>
 		<VersionSuffix Condition=" '$(IsPreview)' == 'true' ">preview</VersionSuffix>
 		<Version Condition=" '$(VersionSuffix)' == '' ">$(ClientVersion)</Version>
@@ -65,14 +65,14 @@
 -->
 	<!-- Common dependencies -->
 	<ItemGroup>
-		<PackageReference Include="Microsoft.Bcl.TimeProvider" Version="10.0.1" />
-		<PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.1" />
-		<PackageReference Include="Microsoft.Extensions.Options" Version="10.0.1" />
+		<PackageReference Include="Microsoft.Bcl.TimeProvider" Version="10.0.5" />
+		<PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.5" />
+		<PackageReference Include="Microsoft.Extensions.Options" Version="10.0.5" />
 	</ItemGroup>
 
 	<!-- Npgsql: net10.0 -->
 	<ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
-		<PackageReference Include="Npgsql" Version="10.0.1" />
+		<PackageReference Include="Npgsql" Version="10.0.2" />
 	</ItemGroup>
 
 	<!-- Npgsql: net8.0, net9.0 -->

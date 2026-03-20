@@ -38,6 +38,8 @@ internal sealed class SqlQueries
 
     private const string DeleteCacheItemFormat = "DELETE FROM {0} WHERE id = @id";
 
+    private const string AcquireAdvisoryTransactionLockFormat = "SELECT pg_advisory_xact_lock(hashtextextended(@id, 0));";
+
     public const string DeleteExpiredCacheItemsFormat = "DELETE FROM {0} WHERE expiresAtTime < @utcNow";
 
     private const string CreateSchemaFormat = "CREATE SCHEMA IF NOT EXISTS {0}";
@@ -68,6 +70,7 @@ internal sealed class SqlQueries
         DeleteCacheItem = string.Format(CultureInfo.InvariantCulture, DeleteCacheItemFormat, tableNameWithSchema);
         DeleteExpiredCacheItems = string.Format(CultureInfo.InvariantCulture, DeleteExpiredCacheItemsFormat, tableNameWithSchema);
         SetCacheItem = string.Format(CultureInfo.InvariantCulture, SetCacheItemFormat, tableNameWithSchema);
+        AcquireAdvisoryTransactionLock = AcquireAdvisoryTransactionLockFormat;
         CreateSchema = string.Format(CultureInfo.InvariantCulture, CreateSchemaFormat, schemaName, logType);
         CreateTable = string.Format(CultureInfo.InvariantCulture, CreateTableFormat, tableNameWithSchema, logType);
         CreateIndex = string.Format(CultureInfo.InvariantCulture, CreateNonClusteredIndexOnExpirationTimeFormat,tableNameWithSchema);
@@ -78,6 +81,8 @@ internal sealed class SqlQueries
     public string GetCacheItemWithoutValue { get; }
 
     public string SetCacheItem { get; }
+
+    public string AcquireAdvisoryTransactionLock { get; }
 
     public string DeleteCacheItem { get; }
 

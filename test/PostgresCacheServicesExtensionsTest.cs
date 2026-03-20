@@ -1,10 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System;
 using System.Linq;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
+using Npgsql;
 using Xunit;
 
 namespace Microsoft.Extensions.Caching.Postgres;
@@ -59,4 +61,107 @@ public class PostgresCacheServicesExtensionsTest
 
         Assert.Same(services, services.AddDistributedPostgresCache(_ => { }));
     }
+
+    [Fact]
+    public void AddDistributedPostgresCache_WithDataSourceOnly_ResolvesCacheWithoutConnectionString()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var dataSource = NpgsqlDataSource.Create("Host=Fake;Username=Fake;Password=Fake;Database=Fake;");
+
+        services.AddDistributedPostgresCache(options =>
+        {
+            options.DataSource = dataSource;
+            options.SchemaName = "Fake";
+            options.TableName = "Fake";
+        });
+
+        // Act
+        var serviceProvider = services.BuildServiceProvider();
+        var cache = serviceProvider.GetRequiredService<IDistributedCache>();
+
+        // Assert
+        Assert.IsType<PostgresCache>(cache);
+    }
+
+    [Fact]
+    public void AddDistributedPostgresCache_WithBuilderAndDataSource_PrioritizesSource()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var dataSource = NpgsqlDataSource.Create("Host=Fake;Username=Fake;Password=Fake;Database=Fake;");
+        var builderCallbackInvoked = false;
+
+        services.AddDistributedPostgresCache(options =>
+        {
+            options.DataSource = dataSource;
+            options.SchemaName = "Fake";
+            options.TableName = "Fake";
+        }, _ =>
+        {
+            builderCallbackInvoked = true;
+            throw new InvalidOperationException("Builder callback should not be used when DataSource is provided.");
+        });
+
+        // Act
+        var serviceProvider = services.BuildServiceProvider();
+        var cache = serviceProvider.GetRequiredService<IDistributedCache>();
+
+        // Assert
+        Assert.IsType<PostgresCache>(cache);
+        Assert.False(builderCallbackInvoked);
+    }
+
+    [Fact]
+    public void AddDistributedPostgresCache_WithDataSourceAndConfigureDataSourceBuilder_PrioritizesSource()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var dataSource = NpgsqlDataSource.Create("Host=Fake;Username=Fake;Password=Fake;Database=Fake;");
+
+        var builderCallbackInvoked = false;
+
+        services.AddDistributedPostgresCache(options =>
+        {
+            options.DataSource = dataSource;
+            options.SchemaName = "Fake";
+            options.TableName = "Fake";
+            options.ConfigureDataSourceBuilder = _ =>
+            {
+                builderCallbackInvoked = true;
+                throw new InvalidOperationException("Builder callback should not be used when DataSource is provided.");
+            };
+        });
+
+        // Act
+        var serviceProvider = services.BuildServiceProvider();
+        var cache = serviceProvider.GetRequiredService<IDistributedCache>();
+
+        // Assert
+        Assert.IsType<PostgresCache>(cache);
+        Assert.False(builderCallbackInvoked);
+    }
+
+    [Fact]
+    public void AddDistributedPostgresCache_WithDataSourceInstanceOverload_ResolvesCacheWithoutConnectionString()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var dataSource = NpgsqlDataSource.Create("Host=Fake;Username=Fake;Password=Fake;Database=Fake;");
+
+        services.AddDistributedPostgresCache(options =>
+        {
+            options.SchemaName = "Fake";
+            options.TableName = "Fake";
+            options.DataSource = dataSource;
+        });
+
+        // Act
+        var serviceProvider = services.BuildServiceProvider();
+        var cache = serviceProvider.GetRequiredService<IDistributedCache>();
+
+        // Assert
+        Assert.IsType<PostgresCache>(cache);
+    }
+
 }
